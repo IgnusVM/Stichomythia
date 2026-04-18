@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { GenerateTab } from '@/components/generation/GenerateTab';
 import { EmptyState } from '@/components/generation/EmptyState';
 import { AudioTab } from '@/components/audio/AudioTab';
+import { ExportTab } from '@/components/export/ExportTab';
 
 type Tab = 'generate' | 'audio' | 'export';
 
@@ -106,7 +107,10 @@ export function ConversationPage() {
             onConversationUpdate={handleConversationUpdate}
           />
         ) : (
-          <div className="p-6 text-muted-foreground">Export tab coming in Phase 5</div>
+          <ExportTab
+            conversation={conversation}
+            characters={convCharacters}
+          />
         )}
       </div>
     </div>

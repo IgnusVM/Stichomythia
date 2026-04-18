@@ -8,6 +8,7 @@ import { conversationsRouter } from './routes/conversations.js';
 import { settingsRouter } from './routes/settings.js';
 import { ttsRouter } from './routes/tts.js';
 import { generationRouter } from './routes/generation.js';
+import { exportRouter } from './routes/export.js';
 
 const app = express();
 const PORT = 3001;
@@ -20,6 +21,7 @@ app.use('/api/conversations', conversationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/tts', ttsRouter);
 app.use('/api/generation', generationRouter);
+app.use('/api/export', exportRouter);
 
 app.use('/audio', express.static(path.resolve('./data/audio')));
 
