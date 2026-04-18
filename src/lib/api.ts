@@ -3,6 +3,7 @@ import type {
   Conversation,
   AppSettings,
   EdgeTtsVoice,
+  Turn,
 } from '@/types';
 
 const BASE = '/api';
@@ -88,5 +89,70 @@ export const api = {
       if (!res.ok) throw new Error(`TTS preview failed: ${res.status}`);
       return res.blob();
     },
+  },
+
+  generation: {
+    generate: (conversationId: string, segmentCount = 1) => {
+      return new EventSource(
+        `${BASE}/generation/generate?conversationId=${conversationId}&segmentCount=${segmentCount}`,
+      );
+    },
+    generateStream: async (conversationId: string, segmentCount: number, handlers: {
+      onChunk?: (text: string, segmentIndex: number) => void;
+      onSegmentStart?: (segmentIndex: number, segmentNumber: number) => void;
+      onSegmentComplete?: (data: unknown) => void;
+      onComplete?: (data: unknown) => void;
+      onError?: (message: string) => void;
+    }) => {
+      const res = await fetch(`${BASE}/generation/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, segmentCount }),
+      });
+
+      if (!res.body) throw new Error('No response body');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7);
+          } else if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            switch (currentEvent) {
+              case 'chunk': handlers.onChunk?.(data.text, data.segmentIndex); break;
+              case 'segment_start': handlers.onSegmentStart?.(data.segmentIndex, data.segmentNumber); break;
+              case 'segment_complete': handlers.onSegmentComplete?.(data); break;
+              case 'complete': handlers.onComplete?.(data); break;
+              case 'error': handlers.onError?.(data.message); break;
+            }
+          }
+        }
+      }
+    },
+    approveSegment: (conversationId: string, segmentId: string) =>
+      request<{ success: boolean }>(`/generation/approve-segment/${conversationId}/${segmentId}`, { method: 'POST' }),
+    approveAll: (conversationId: string) =>
+      request<{ success: boolean }>(`/generation/approve-all/${conversationId}`, { method: 'POST' }),
+    editTurn: (conversationId: string, turnId: string, text: string) =>
+      request<Turn>(`/generation/turn/${conversationId}/${turnId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ text }),
+      }),
+    deleteTurn: (conversationId: string, turnId: string) =>
+      request<{ success: boolean }>(`/generation/turn/${conversationId}/${turnId}`, { method: 'DELETE' }),
+    deleteSegmentsFrom: (conversationId: string, segmentId: string) =>
+      request<{ success: boolean }>(`/generation/segments-from/${conversationId}/${segmentId}`, { method: 'DELETE' }),
   },
 };

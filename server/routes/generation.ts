@@ -1,0 +1,518 @@
+import { Router } from 'express';
+import path from 'path';
+import { v4 as uuid } from 'uuid';
+import { readJson, writeJson, getConversationsDir, getCharactersDir } from '../utils/files.js';
+import { generateSegment, createLabelMap, reverseLabelMap, parseSegmentResponse } from '../services/anthropic.js';
+import { analyzeSegment } from '../services/analysis.js';
+import { buildFirstSegmentDirection, buildNextSegmentDirection } from '../services/director.js';
+
+interface Character {
+  id: string;
+  color: string;
+  personality: string;
+  speechStyle: string;
+  interests: string[];
+  quirks: string[];
+  emotionalProfile: {
+    temperament: string;
+    triggers: Array<{ topic: string; reaction: string; intensity: string; description: string }>;
+    recoverySpeed: string;
+  };
+  voice: { edgeTtsVoice: string; rate: string; pitch: string };
+  systemPrompt?: string;
+}
+
+interface Turn {
+  id: string;
+  segmentId: string;
+  conversationId: string;
+  sequenceNumber: number;
+  characterId: string;
+  text: string;
+  moodTag: string;
+  audioFile?: string;
+  audioDurationMs?: number;
+  pauseAfterMs: number;
+  status: 'draft' | 'edited' | 'approved' | 'rendered';
+}
+
+interface EmotionalSummary {
+  emotionalStates: Record<string, { emotion: string; intensity: number; valence: number; note: string }>;
+  unresolvedThreads: string[];
+  topicsCovered: string[];
+  suggestedNextDirection: string;
+}
+
+interface Segment {
+  id: string;
+  conversationId: string;
+  sequenceNumber: number;
+  turns: Turn[];
+  directorInput: {
+    emotionalLandscape: Record<string, string>;
+    suggestions: string[];
+    topicSeeds: string[];
+    targetTurnCount: number;
+  };
+  emotionalSummary: EmotionalSummary;
+  rawResponse: string;
+  generationMode: 'live' | 'batch';
+  batchId?: string;
+  createdAt: string;
+  status: 'draft' | 'approved' | 'rendered';
+}
+
+interface MemoryBlock {
+  coversSegments: [number, number];
+  coversTurns: [number, number];
+  summary: string;
+  keyTopics: string[];
+  emotionalHighlights: string[];
+  runningJokes: string[];
+  tier: 'recent' | 'mid' | 'old';
+  createdAt: string;
+}
+
+interface Conversation {
+  id: string;
+  name: string;
+  characterIds: string[];
+  segments: Segment[];
+  memories: MemoryBlock[];
+  settings: {
+    model: string;
+    generationMode: string;
+    turnsPerSegment: number;
+    memorySummaryInterval: number;
+    topicSeeds: string[];
+    pauseRange: { minMs: number; maxMs: number };
+    longPauseChance: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+  totalTurns: number;
+  totalDurationMs?: number;
+  status: string;
+}
+
+function generatePause(pauseRange: { minMs: number; maxMs: number }, longPauseChance: number, moodTag: string): number {
+  const isLongPause = Math.random() < longPauseChance;
+  let base = pauseRange.minMs + Math.random() * (pauseRange.maxMs - pauseRange.minMs);
+
+  if (isLongPause) base *= 2;
+
+  const mood = moodTag.toLowerCase();
+  if (mood.includes('excited') || mood.includes('eager') || mood.includes('amused')) {
+    base *= 0.6;
+  } else if (mood.includes('uncomfortable') || mood.includes('awkward') || mood.includes('hesitant')) {
+    base *= 1.5;
+  } else if (mood.includes('annoyed') || mood.includes('irritated')) {
+    base *= 0.4;
+  } else if (mood.includes('thoughtful') || mood.includes('pensive')) {
+    base *= 1.3;
+  }
+
+  return Math.round(Math.max(100, base));
+}
+
+function getRecentTurns(segments: Segment[], count: number): string[] {
+  const allTurns: string[] = [];
+  for (const seg of segments) {
+    for (const turn of seg.turns) {
+      const labelMap = createLabelMap([] as string[]);
+      const reverseMap = reverseLabelMap(labelMap);
+      const label = Object.entries(reverseMap).find(([, id]) => id === turn.characterId)?.[0] ?? 'Person ?';
+      allTurns.push(`[${label}] (${turn.moodTag}): ${turn.text}`);
+    }
+  }
+  return allTurns.slice(-count);
+}
+
+function getRecentTurnsWithLabelMap(segments: Segment[], count: number, labelMap: Map<string, string>): string[] {
+  const reverseMap = reverseLabelMap(labelMap);
+  const allTurns: string[] = [];
+  for (const seg of segments) {
+    for (const turn of seg.turns) {
+      let label = 'Person ?';
+      for (const [id, lbl] of labelMap) {
+        if (id === turn.characterId) { label = lbl; break; }
+      }
+      allTurns.push(`[${label}] (${turn.moodTag}): ${turn.text}`);
+    }
+  }
+  return allTurns.slice(-count);
+}
+
+export const generationRouter = Router();
+
+generationRouter.post('/generate', async (req, res) => {
+  const { conversationId, segmentCount = 1 } = req.body;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  const sendEvent = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+    const conversation = await readJson<Conversation>(convPath);
+    if (!conversation) {
+      sendEvent('error', { message: 'Conversation not found' });
+      res.end();
+      return;
+    }
+
+    const characters: Character[] = [];
+    for (const charId of conversation.characterIds) {
+      const char = await readJson<Character>(path.join(getCharactersDir(), `${charId}.json`));
+      if (char) characters.push(char);
+    }
+
+    if (characters.length < 2) {
+      sendEvent('error', { message: 'Need at least 2 characters' });
+      res.end();
+      return;
+    }
+
+    const labelMap = createLabelMap(conversation.characterIds);
+    const reverseMap = reverseLabelMap(labelMap);
+
+    conversation.status = 'generating';
+    await writeJson(convPath, conversation);
+    sendEvent('status', { status: 'generating' });
+
+    for (let i = 0; i < segmentCount; i++) {
+      const segNum = conversation.segments.length;
+      sendEvent('segment_start', { segmentIndex: i, segmentNumber: segNum });
+
+      let directorInput;
+      if (segNum === 0) {
+        directorInput = buildFirstSegmentDirection(
+          conversation.settings.topicSeeds,
+          conversation.settings.turnsPerSegment,
+        );
+      } else {
+        const prevSegment = conversation.segments[segNum - 1];
+        const coveredTopics = conversation.segments.flatMap(s => s.emotionalSummary.topicsCovered);
+        directorInput = buildNextSegmentDirection(
+          prevSegment.emotionalSummary,
+          conversation.settings.topicSeeds,
+          coveredTopics,
+          conversation.settings.turnsPerSegment,
+        );
+      }
+
+      const memories = conversation.memories.map(m => ({
+        summary: m.summary,
+        tier: m.tier,
+      }));
+
+      const recentTurns = getRecentTurnsWithLabelMap(conversation.segments, 10, labelMap);
+
+      let chunkBuffer = '';
+      const result = await generateSegment({
+        characters,
+        labelMap,
+        memories,
+        recentTurns,
+        directorInput,
+        model: conversation.settings.model,
+        onChunk: (text) => {
+          chunkBuffer += text;
+          sendEvent('chunk', { text, segmentIndex: i });
+        },
+      });
+
+      sendEvent('segment_parsing', { segmentIndex: i });
+
+      const segmentId = uuid();
+      const turns: Turn[] = result.turns.map((t, idx) => ({
+        id: uuid(),
+        segmentId,
+        conversationId,
+        sequenceNumber: conversation.totalTurns + idx,
+        characterId: reverseMap.get(t.characterLabel) ?? conversation.characterIds[0],
+        text: t.text,
+        moodTag: t.moodTag,
+        pauseAfterMs: generatePause(conversation.settings.pauseRange, conversation.settings.longPauseChance, t.moodTag),
+        status: 'draft' as const,
+      }));
+
+      sendEvent('segment_analyzing', { segmentIndex: i, turnCount: turns.length });
+
+      const emotionalSummary = await analyzeSegment(result.raw);
+
+      const segment: Segment = {
+        id: segmentId,
+        conversationId,
+        sequenceNumber: segNum,
+        turns,
+        directorInput,
+        emotionalSummary,
+        rawResponse: result.raw,
+        generationMode: 'live',
+        createdAt: new Date().toISOString(),
+        status: 'draft',
+      };
+
+      conversation.segments.push(segment);
+      conversation.totalTurns += turns.length;
+      conversation.updatedAt = new Date().toISOString();
+      await writeJson(convPath, conversation);
+
+      sendEvent('segment_complete', {
+        segmentIndex: i,
+        segment: {
+          id: segment.id,
+          sequenceNumber: segment.sequenceNumber,
+          turnCount: turns.length,
+          emotionalSummary: segment.emotionalSummary,
+        },
+        turns,
+      });
+    }
+
+    conversation.status = 'generated';
+    await writeJson(convPath, conversation);
+    sendEvent('complete', {
+      totalSegments: conversation.segments.length,
+      totalTurns: conversation.totalTurns,
+    });
+  } catch (err) {
+    sendEvent('error', { message: String(err) });
+  }
+
+  res.end();
+});
+
+generationRouter.post('/approve-segment/:conversationId/:segmentId', async (req, res) => {
+  const { conversationId, segmentId } = req.params;
+  const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+  const conversation = await readJson<Conversation>(convPath);
+  if (!conversation) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const segment = conversation.segments.find(s => s.id === segmentId);
+  if (!segment) { res.status(404).json({ error: 'Segment not found' }); return; }
+
+  segment.status = 'approved';
+  for (const turn of segment.turns) {
+    if (turn.status === 'draft') turn.status = 'approved';
+  }
+
+  conversation.updatedAt = new Date().toISOString();
+  await writeJson(convPath, conversation);
+  res.json({ success: true });
+});
+
+generationRouter.post('/approve-all/:conversationId', async (req, res) => {
+  const { conversationId } = req.params;
+  const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+  const conversation = await readJson<Conversation>(convPath);
+  if (!conversation) { res.status(404).json({ error: 'Not found' }); return; }
+
+  for (const segment of conversation.segments) {
+    segment.status = 'approved';
+    for (const turn of segment.turns) {
+      if (turn.status === 'draft') turn.status = 'approved';
+    }
+  }
+
+  conversation.updatedAt = new Date().toISOString();
+  await writeJson(convPath, conversation);
+  res.json({ success: true });
+});
+
+generationRouter.put('/turn/:conversationId/:turnId', async (req, res) => {
+  const { conversationId, turnId } = req.params;
+  const { text } = req.body;
+  const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+  const conversation = await readJson<Conversation>(convPath);
+  if (!conversation) { res.status(404).json({ error: 'Not found' }); return; }
+
+  for (const segment of conversation.segments) {
+    const turn = segment.turns.find(t => t.id === turnId);
+    if (turn) {
+      turn.text = text;
+      turn.status = 'edited';
+      conversation.updatedAt = new Date().toISOString();
+      await writeJson(convPath, conversation);
+      res.json(turn);
+      return;
+    }
+  }
+
+  res.status(404).json({ error: 'Turn not found' });
+});
+
+generationRouter.delete('/turn/:conversationId/:turnId', async (req, res) => {
+  const { conversationId, turnId } = req.params;
+  const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+  const conversation = await readJson<Conversation>(convPath);
+  if (!conversation) { res.status(404).json({ error: 'Not found' }); return; }
+
+  for (const segment of conversation.segments) {
+    const idx = segment.turns.findIndex(t => t.id === turnId);
+    if (idx !== -1) {
+      segment.turns.splice(idx, 1);
+      for (let j = idx; j < segment.turns.length; j++) {
+        segment.turns[j].sequenceNumber--;
+      }
+      conversation.totalTurns--;
+      conversation.updatedAt = new Date().toISOString();
+      await writeJson(convPath, conversation);
+      res.json({ success: true });
+      return;
+    }
+  }
+
+  res.status(404).json({ error: 'Turn not found' });
+});
+
+generationRouter.post('/reroll-segment/:conversationId/:segmentId', async (req, res) => {
+  const { conversationId, segmentId } = req.params;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  const sendEvent = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+    const conversation = await readJson<Conversation>(convPath);
+    if (!conversation) { sendEvent('error', { message: 'Not found' }); res.end(); return; }
+
+    const segIdx = conversation.segments.findIndex(s => s.id === segmentId);
+    if (segIdx === -1) { sendEvent('error', { message: 'Segment not found' }); res.end(); return; }
+
+    const characters: Character[] = [];
+    for (const charId of conversation.characterIds) {
+      const char = await readJson<Character>(path.join(getCharactersDir(), `${charId}.json`));
+      if (char) characters.push(char);
+    }
+
+    const labelMap = createLabelMap(conversation.characterIds);
+    const reverseMap = reverseLabelMap(labelMap);
+    const oldSegment = conversation.segments[segIdx];
+    const directorInput = oldSegment.directorInput;
+
+    const priorSegments = conversation.segments.slice(0, segIdx);
+    const memories = conversation.memories
+      .filter(m => m.coversSegments[1] < segIdx)
+      .map(m => ({ summary: m.summary, tier: m.tier }));
+    const recentTurns = getRecentTurnsWithLabelMap(priorSegments, 10, labelMap);
+
+    const removedTurnCount = oldSegment.turns.length;
+
+    sendEvent('segment_start', { segmentIndex: 0, segmentNumber: segIdx });
+
+    const result = await generateSegment({
+      characters,
+      labelMap,
+      memories,
+      recentTurns,
+      directorInput,
+      model: conversation.settings.model,
+      onChunk: (text) => sendEvent('chunk', { text, segmentIndex: 0 }),
+    });
+
+    const newSegmentId = uuid();
+    const baseSeqNum = oldSegment.turns[0]?.sequenceNumber ?? 0;
+    const turns: Turn[] = result.turns.map((t, idx) => ({
+      id: uuid(),
+      segmentId: newSegmentId,
+      conversationId,
+      sequenceNumber: baseSeqNum + idx,
+      characterId: reverseMap.get(t.characterLabel) ?? conversation.characterIds[0],
+      text: t.text,
+      moodTag: t.moodTag,
+      pauseAfterMs: generatePause(conversation.settings.pauseRange, conversation.settings.longPauseChance, t.moodTag),
+      status: 'draft' as const,
+    }));
+
+    const emotionalSummary = await analyzeSegment(result.raw);
+
+    const newSegment: Segment = {
+      id: newSegmentId,
+      conversationId,
+      sequenceNumber: segIdx,
+      turns,
+      directorInput,
+      emotionalSummary,
+      rawResponse: result.raw,
+      generationMode: 'live',
+      createdAt: new Date().toISOString(),
+      status: 'draft',
+    };
+
+    conversation.segments[segIdx] = newSegment;
+    conversation.totalTurns += turns.length - removedTurnCount;
+
+    let seqCounter = 0;
+    for (const seg of conversation.segments) {
+      for (const turn of seg.turns) {
+        turn.sequenceNumber = seqCounter++;
+      }
+    }
+    conversation.totalTurns = seqCounter;
+
+    conversation.updatedAt = new Date().toISOString();
+    await writeJson(convPath, conversation);
+
+    sendEvent('segment_complete', {
+      segmentIndex: 0,
+      segment: {
+        id: newSegment.id,
+        sequenceNumber: newSegment.sequenceNumber,
+        turnCount: turns.length,
+        emotionalSummary: newSegment.emotionalSummary,
+      },
+      turns,
+    });
+
+    sendEvent('complete', {
+      totalSegments: conversation.segments.length,
+      totalTurns: conversation.totalTurns,
+    });
+  } catch (err) {
+    sendEvent('error', { message: String(err) });
+  }
+
+  res.end();
+});
+
+generationRouter.delete('/segments-from/:conversationId/:segmentId', async (req, res) => {
+  const { conversationId, segmentId } = req.params;
+  const convPath = path.join(getConversationsDir(), `${conversationId}.json`);
+  const conversation = await readJson<Conversation>(convPath);
+  if (!conversation) { res.status(404).json({ error: 'Not found' }); return; }
+
+  const segIdx = conversation.segments.findIndex(s => s.id === segmentId);
+  if (segIdx === -1) { res.status(404).json({ error: 'Segment not found' }); return; }
+
+  conversation.segments = conversation.segments.slice(0, segIdx);
+
+  let seqCounter = 0;
+  for (const seg of conversation.segments) {
+    for (const turn of seg.turns) {
+      turn.sequenceNumber = seqCounter++;
+    }
+  }
+  conversation.totalTurns = seqCounter;
+
+  conversation.memories = conversation.memories.filter(m => m.coversSegments[1] < segIdx);
+
+  conversation.updatedAt = new Date().toISOString();
+  conversation.status = conversation.segments.length > 0 ? 'generated' : 'draft';
+  await writeJson(convPath, conversation);
+  res.json({ success: true, totalSegments: conversation.segments.length, totalTurns: conversation.totalTurns });
+});
