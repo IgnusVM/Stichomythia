@@ -12,6 +12,7 @@ import {
   Users,
   Settings,
 } from 'lucide-react';
+import { MalevolentGodLogo } from '@/components/icons/MalevolentGodLogo';
 
 interface QuickLink {
   to: string;
@@ -77,7 +78,7 @@ export function Home() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="" className="h-24 w-auto mx-auto mb-3" />
+          <MalevolentGodLogo className="w-28 h-28 mx-auto mb-3 text-gold" />
           <img src="/title.png" alt="Stichomythia" className="h-12 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Multi-speaker Bluetooth audio platform — AI conversations, stem playback, and system audio routing through your speaker array.

@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ApiStatus } from './ApiStatus';
 import { MessageSquare, Music, Monitor, Users, Settings, Speaker } from 'lucide-react';
+import { MalevolentGodLogo } from '@/components/icons/MalevolentGodLogo';
 
 const navItems = [
   { to: '/conversations', label: 'Conversations', icon: MessageSquare },
@@ -19,7 +20,7 @@ export function NavBar() {
       <div className="flex items-center justify-between px-6 h-20">
         <div className="flex items-center gap-8 no-drag">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img src="/logo.png" alt="" className="h-14 w-auto" />
+            <MalevolentGodLogo className="h-12 w-12 text-gold" />
             <img src="/title.png" alt="Stichomythia" className="h-10" />
           </Link>
           <nav className="flex items-center gap-1">

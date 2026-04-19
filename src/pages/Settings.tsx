@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Check, X, Loader2 } from 'lucide-react';
+import { MalevolentGodLogo } from '@/components/icons/MalevolentGodLogo';
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -197,9 +198,12 @@ export function SettingsPage() {
       </Card>
       <div className="flex items-center gap-3 mt-8 pt-6 border-t border-border">
         <img src="/mg-logo.png" alt="" className="h-10 w-10 rounded" />
-        <div className="text-xs text-muted-foreground">
+        <div className="flex-1 text-xs text-muted-foreground">
           <p className="font-heading uppercase tracking-wider text-foreground/70">Malevolent Gods Software</p>
-          <p>Stichomythia v{__APP_VERSION__}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <MalevolentGodLogo className="w-3.5 h-3.5 text-gold/60" />
+            <p>Stichomythia v{__APP_VERSION__}</p>
+          </div>
         </div>
       </div>
     </div>
