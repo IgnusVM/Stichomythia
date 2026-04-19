@@ -125,6 +125,13 @@ export function SettingsPage() {
           )}
         </CardContent>
       </Card>
+      <div className="flex items-center gap-3 mt-8 pt-6 border-t border-border">
+        <img src="/mg-logo.png" alt="" className="h-10 w-10 rounded" />
+        <div className="text-xs text-muted-foreground">
+          <p className="font-heading uppercase tracking-wider text-foreground/70">Malevolent Gods Software</p>
+          <p>Stichomythia v{__APP_VERSION__}</p>
+        </div>
+      </div>
     </div>
   );
 }

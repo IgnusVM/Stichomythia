@@ -6,6 +6,9 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '1.3.0'),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
