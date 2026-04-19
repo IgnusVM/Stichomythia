@@ -17,7 +17,7 @@ const STARTER_CHARACTERS = [
     interests: ['cooking', 'classic cars', 'philosophy'],
     quirks: ['sighs before speaking', 'plays devil\'s advocate'],
     emotionalProfile: { temperament: 'even-keeled' as const, triggers: [], recoverySpeed: 'fast' as const },
-    voice: { edgeTtsVoice: 'en-US-GuyNeural', rate: '+0%', pitch: '+0Hz' },
+    voice: { edgeTtsVoice: 'en-US-AndrewMultilingualNeural', rate: '+0%', pitch: '+0Hz' },
   },
   {
     color: '#3498DB',
@@ -26,7 +26,7 @@ const STARTER_CHARACTERS = [
     interests: ['travel', 'movies', 'history'],
     quirks: ['interrupts with tangents', 'tells long stories'],
     emotionalProfile: { temperament: 'cheerful' as const, triggers: [], recoverySpeed: 'fast' as const },
-    voice: { edgeTtsVoice: 'en-US-JennyNeural', rate: '+5%', pitch: '+0Hz' },
+    voice: { edgeTtsVoice: 'en-US-AvaMultilingualNeural', rate: '+5%', pitch: '+0Hz' },
   },
   {
     color: '#2ECC71',
@@ -35,7 +35,7 @@ const STARTER_CHARACTERS = [
     interests: ['science', 'music', 'gardening'],
     quirks: ['asks follow-up questions', 'pauses to think'],
     emotionalProfile: { temperament: 'sensitive' as const, triggers: [], recoverySpeed: 'medium' as const },
-    voice: { edgeTtsVoice: 'en-US-AriaNeural', rate: '-5%', pitch: '+0Hz' },
+    voice: { edgeTtsVoice: 'en-US-EmmaMultilingualNeural', rate: '-5%', pitch: '+0Hz' },
   },
   {
     color: '#F39C12',
@@ -44,7 +44,7 @@ const STARTER_CHARACTERS = [
     interests: ['sports', 'technology', 'stand-up comedy'],
     quirks: ['turns everything into a competition', 'makes sarcastic comments'],
     emotionalProfile: { temperament: 'sardonic' as const, triggers: [], recoverySpeed: 'fast' as const },
-    voice: { edgeTtsVoice: 'en-US-DavisNeural', rate: '+0%', pitch: '-5Hz' },
+    voice: { edgeTtsVoice: 'en-US-BrianMultilingualNeural', rate: '+0%', pitch: '-5Hz' },
   },
 ];
 

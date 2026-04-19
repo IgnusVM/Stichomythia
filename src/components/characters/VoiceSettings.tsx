@@ -42,7 +42,15 @@ export function VoiceSettings({ voice, onChange }: Props) {
   useEffect(() => {
     api.tts
       .voices()
-      .then(setVoices)
+      .then((v) => {
+        v.sort((a, b) => {
+          const aML = a.name.includes('Multilingual') ? 0 : 1;
+          const bML = b.name.includes('Multilingual') ? 0 : 1;
+          if (aML !== bML) return aML - bML;
+          return a.name.localeCompare(b.name);
+        });
+        setVoices(v);
+      })
       .catch(() => {});
   }, []);
 
@@ -85,7 +93,7 @@ export function VoiceSettings({ voice, onChange }: Props) {
           <SelectContent className="max-h-60">
             {voices.map((v) => (
               <SelectItem key={v.name} value={v.name}>
-                {v.friendlyName || v.name} ({v.gender}, {v.locale})
+                {v.name.includes('Multilingual') ? '\u2605 ' : ''}{v.friendlyName || v.name} ({v.gender})
               </SelectItem>
             ))}
             {voices.length === 0 && (

@@ -193,7 +193,7 @@ ttsRouter.post('/render', async (req, res) => {
       const char = charMap.get(turn.characterId);
       return {
         text: turn.text,
-        voice: char?.voice.edgeTtsVoice ?? 'en-US-GuyNeural',
+        voice: char?.voice.edgeTtsVoice ?? 'en-US-AndrewMultilingualNeural',
         rate: char?.voice.rate ?? '+0%',
         pitch: char?.voice.pitch ?? '+0Hz',
         conversationId,
@@ -275,7 +275,7 @@ ttsRouter.post('/rerender-turn', async (req, res) => {
   const { renderTurn } = await import('../services/tts.js');
   const result = await renderTurn({
     text: targetTurn.text,
-    voice: char?.voice.edgeTtsVoice ?? 'en-US-GuyNeural',
+    voice: char?.voice.edgeTtsVoice ?? 'en-US-AndrewMultilingualNeural',
     rate: char?.voice.rate ?? '+0%',
     pitch: char?.voice.pitch ?? '+0Hz',
     conversationId,

@@ -115,7 +115,7 @@ charactersRouter.post('/', async (req, res) => {
       recoverySpeed: 'medium',
     },
     voice: req.body.voice ?? {
-      edgeTtsVoice: 'en-US-GuyNeural',
+      edgeTtsVoice: 'en-US-AndrewMultilingualNeural',
       rate: '+0%',
       pitch: '+0Hz',
     },
