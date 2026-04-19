@@ -1,7 +1,7 @@
 {
   "name": "stichomythia",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "AI conversation generator with TTS audio rendering",
   "author": "Malevolent Gods Software",
   "type": "module",
@@ -69,9 +69,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
+      "installerIcon": "build/installer.ico",
+      "uninstallerIcon": "build/installer.ico",
+      "installerHeaderIcon": "build/installer.ico",
       "installerSidebar": "build/installerSidebar.bmp"
     },
     "publish": null,
