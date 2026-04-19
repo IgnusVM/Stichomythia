@@ -206,6 +206,50 @@ export const DEFAULT_SETTINGS: AppSettings = {
   setupComplete: false,
 };
 
+export interface EQBandSettings {
+  frequency: number;
+  gain: number;
+  Q: number;
+  type: BiquadFilterType;
+}
+
+export interface ChannelMixerState {
+  speakerId: string;
+  volume: number;
+  muted: boolean;
+  soloed: boolean;
+  eq: EQBandSettings[];
+  compressorEnabled: boolean;
+}
+
+export interface MixerState {
+  masterVolume: number;
+  channels: ChannelMixerState[];
+}
+
+export interface StemTrackState {
+  id: string;
+  fileName: string;
+  speakerId: string;
+  muted: boolean;
+  soloed: boolean;
+  duration: number;
+}
+
+export interface StemSession {
+  id: string;
+  stems: StemTrackState[];
+  createdAt: string;
+}
+
+export const DEFAULT_EQ_BANDS: EQBandSettings[] = [
+  { frequency: 80, gain: 0, Q: 0.7, type: 'lowshelf' },
+  { frequency: 250, gain: 0, Q: 1.4, type: 'peaking' },
+  { frequency: 1000, gain: 0, Q: 1.4, type: 'peaking' },
+  { frequency: 4000, gain: 0, Q: 1.4, type: 'peaking' },
+  { frequency: 12000, gain: 0, Q: 0.7, type: 'highshelf' },
+];
+
 export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
   model: 'claude-opus-4-6',
   generationMode: 'batch',

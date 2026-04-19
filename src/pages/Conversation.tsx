@@ -8,26 +8,23 @@ import {
   ArrowLeft,
   MessageSquare,
   Volume2,
-  Speaker,
   Download,
 } from 'lucide-react';
 import { GenerateTab } from '@/components/generation/GenerateTab';
 import { EmptyState } from '@/components/generation/EmptyState';
 import { AudioTab } from '@/components/audio/AudioTab';
 import { ExportTab } from '@/components/export/ExportTab';
-import { SpeakersTab } from '@/components/speakers/SpeakersTab';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-type Tab = 'generate' | 'audio' | 'speakers' | 'export';
+type Tab = 'generate' | 'audio' | 'export';
 
 const sidebarItems: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
   { id: 'generate', label: 'Generate', icon: MessageSquare },
   { id: 'audio', label: 'Audio', icon: Volume2 },
-  { id: 'speakers', label: 'Speakers', icon: Speaker },
   { id: 'export', label: 'Export', icon: Download },
 ];
 
@@ -64,7 +61,7 @@ export function ConversationPage() {
   const hasSegments = conversation.segments.length > 0;
 
   return (
-    <div className="flex h-[calc(100vh-5rem)]">
+    <div className="flex h-full">
       {hasSegments && (
         <aside className="w-14 border-r border-gold/10 bg-card/50 flex flex-col items-center py-4 gap-1 shrink-0">
           {sidebarItems.map(({ id: itemId, label, icon: Icon }) => (
@@ -136,12 +133,6 @@ export function ConversationPage() {
             />
           ) : tab === 'audio' ? (
             <AudioTab
-              conversation={conversation}
-              characters={convCharacters}
-              onConversationUpdate={handleConversationUpdate}
-            />
-          ) : tab === 'speakers' ? (
-            <SpeakersTab
               conversation={conversation}
               characters={convCharacters}
               onConversationUpdate={handleConversationUpdate}
