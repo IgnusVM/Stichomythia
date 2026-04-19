@@ -118,6 +118,7 @@ function buildUserMessageParts(
   memories: MemoryBlock[],
   recentTurns: string[],
   directorInput: DirectorInput,
+  coveredTopics: string[] = [],
 ): Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> {
   const parts: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [];
 
@@ -150,12 +151,16 @@ function buildUserMessageParts(
     ? `\n- The topic could drift toward ${directorInput.topicSeeds[Math.floor(Math.random() * directorInput.topicSeeds.length)]} if it fits`
     : '';
 
+  const coveredText = coveredTopics.length > 0
+    ? `\n\nTOPICS ALREADY THOROUGHLY EXPLORED (do NOT circle back to these — find fresh ground):\n${coveredTopics.join(', ')}`
+    : '';
+
   directionParts.push(`== Direction for this segment ==
 Write EXACTLY ${directorInput.targetTurnCount} turns of conversation. Do not stop early — you must reach ${directorInput.targetTurnCount} turns. If the conversation hits a lull, have someone bring up something new. Keep going until you have written all ${directorInput.targetTurnCount} turns.
 
 Current emotional landscape:
 ${landscapeLines || '- Everyone is relaxed and in a good mood'}
-${suggestionsText}${topicText}
+${suggestionsText}${topicText}${coveredText}
 
 Write ONLY the conversation. No preamble, no summary, no commentary.`);
 
@@ -199,10 +204,11 @@ export function buildSegmentPrompt(
   memories: MemoryBlock[],
   recentTurns: string[],
   directorInput: DirectorInput,
+  coveredTopics: string[] = [],
 ): { systemPrompt: string; userMessageParts: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> } {
   return {
     systemPrompt: buildSystemPrompt(characters, labelMap),
-    userMessageParts: buildUserMessageParts(memories, recentTurns, directorInput),
+    userMessageParts: buildUserMessageParts(memories, recentTurns, directorInput, coveredTopics),
   };
 }
 
@@ -213,13 +219,14 @@ export interface GenerateSegmentOptions {
   recentTurns: string[];
   directorInput: DirectorInput;
   model: string;
+  coveredTopics?: string[];
   onChunk?: (text: string) => void;
 }
 
 export async function generateSegment(options: GenerateSegmentOptions): Promise<{ raw: string; turns: ParsedTurn[] }> {
   const client = await getClient();
   const systemPrompt = buildSystemPrompt(options.characters, options.labelMap);
-  const userMessageParts = buildUserMessageParts(options.memories, options.recentTurns, options.directorInput);
+  const userMessageParts = buildUserMessageParts(options.memories, options.recentTurns, options.directorInput, options.coveredTopics ?? []);
 
   const stream = client.messages.stream({
     model: options.model,

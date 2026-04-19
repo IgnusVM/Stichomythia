@@ -70,9 +70,10 @@ You are NOT writing the conversation. You are writing stage direction — descri
 Think about:
 - Character dynamics that should evolve (who's been too quiet? who's dominating? any tension building?)
 - Narrative pacing (has it been intense? time for a breather? time to escalate?)
-- Callbacks to earlier moments that could resurface naturally
 - Topics that would be interesting for THESE specific characters given their personalities and triggers
 - Emotional arcs — not every segment needs conflict, but the conversation should feel like it's going somewhere
+
+CRITICAL: The conversation must ALWAYS move forward. NEVER suggest returning to topics already covered — they are OFF-LIMITS. Push the conversation into genuinely new territory. If all the obvious topics are exhausted, dig into character backstories, hypotheticals, debates, confessions, plans, memories, or completely unexpected tangents. The goal is a conversation that stays fresh for hours.
 
 Return a JSON object:
 {
@@ -102,7 +103,8 @@ ${emotionalState}
 
 UNRESOLVED THREADS: ${previousSummary.unresolvedThreads.join(', ') || 'none'}
 
-TOPICS ALREADY COVERED: ${coveredTopics.join(', ') || 'none'}
+TOPICS THAT ARE OFF-LIMITS (already explored — do NOT revisit these):
+${coveredTopics.join(', ') || 'none yet'}
 
 Write the direction for the next segment.`,
       },
@@ -218,10 +220,18 @@ export function buildNextSegmentDirection(
   }
 
   if (previousSummary.unresolvedThreads.length > 0 && Math.random() > 0.4) {
-    const thread = previousSummary.unresolvedThreads[
-      Math.floor(Math.random() * previousSummary.unresolvedThreads.length)
-    ];
-    suggestions.push(`The unresolved thread about "${thread}" could resurface`);
+    const freshThreads = previousSummary.unresolvedThreads.filter(thread => {
+      const threadText = typeof thread === 'object' ? (thread as any).thread ?? String(thread) : String(thread);
+      return !coveredTopics.some(topic =>
+        threadText.toLowerCase().includes(topic.toLowerCase()) ||
+        topic.toLowerCase().includes(threadText.toLowerCase())
+      );
+    });
+    if (freshThreads.length > 0) {
+      const thread = freshThreads[Math.floor(Math.random() * freshThreads.length)];
+      const threadText = typeof thread === 'object' ? (thread as any).thread ?? String(thread) : String(thread);
+      suggestions.push(`The unresolved thread about "${threadText}" could resurface`);
+    }
   }
 
   const driftChance = Math.min(0.8, 0.3 + segmentNumber * 0.1);

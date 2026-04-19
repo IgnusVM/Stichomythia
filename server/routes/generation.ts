@@ -288,6 +288,7 @@ generationRouter.post('/generate', async (req, res) => {
         tier: m.tier,
       }));
 
+      const allCoveredTopics = conversation.segments.flatMap(s => s.emotionalSummary.topicsCovered);
       const recentTurns = getRecentTurnsWithLabelMap(conversation.segments, 10, labelMap);
 
       let chunkBuffer = '';
@@ -298,6 +299,7 @@ generationRouter.post('/generate', async (req, res) => {
         recentTurns,
         directorInput,
         model: conversation.settings.model,
+        coveredTopics: allCoveredTopics,
         onChunk: (text) => {
           chunkBuffer += text;
           sendEvent('chunk', { text, segmentIndex: i });
@@ -648,9 +650,10 @@ generationRouter.post('/batch', async (req, res) => {
       }));
 
       const recentTurns = getRecentTurnsWithLabelMap(simulatedSegments, 10, labelMap);
+      const batchCoveredTopics = simulatedSegments.flatMap(s => s.emotionalSummary?.topicsCovered ?? []);
 
       const { systemPrompt, userMessageParts } = buildSegmentPrompt(
-        characters, labelMap, memories, recentTurns, directorInput,
+        characters, labelMap, memories, recentTurns, directorInput, batchCoveredTopics,
       );
 
       batchRequests.push({
@@ -767,6 +770,16 @@ generationRouter.post('/batch-results/:conversationId/:batchId', async (req, res
     conversation.totalTurns += newSegments.reduce((a, s) => a + s.turns.length, 0);
     conversation.status = 'generated';
     conversation.updatedAt = new Date().toISOString();
+
+    const updatedMemories = await processMemoryAfterSegment(
+      conversation.segments,
+      conversation.memories,
+      conversation.settings.memorySummaryInterval,
+    );
+    if (updatedMemories) {
+      conversation.memories = updatedMemories;
+    }
+
     await writeJson(convPath, conversation);
 
     res.json({
@@ -815,6 +828,7 @@ generationRouter.post('/reroll-with-direction/:conversationId/:segmentId', async
       .filter(m => m.coversSegments[1] < segIdx)
       .map(m => ({ summary: m.summary, tier: m.tier }));
     const recentTurns = getRecentTurnsWithLabelMap(priorSegments, 10, labelMap);
+    const rerollCoveredTopics = priorSegments.flatMap(s => s.emotionalSummary?.topicsCovered ?? []);
 
     const oldSegment = conversation.segments[segIdx];
     const removedTurnCount = oldSegment.turns.length;
@@ -828,6 +842,7 @@ generationRouter.post('/reroll-with-direction/:conversationId/:segmentId', async
       recentTurns,
       directorInput: newDirection,
       model: conversation.settings.model,
+      coveredTopics: rerollCoveredTopics,
       onChunk: (text) => sendEvent('chunk', { text, segmentIndex: 0 }),
     });
 
