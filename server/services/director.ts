@@ -73,15 +73,20 @@ Think about:
 - Topics that would be interesting for THESE specific characters given their personalities and triggers
 - Emotional arcs — not every segment needs conflict, but the conversation should feel like it's going somewhere
 
-CRITICAL: The conversation must ALWAYS move forward. NEVER suggest returning to topics already covered — they are OFF-LIMITS. Push the conversation into genuinely new territory. If all the obvious topics are exhausted, dig into character backstories, hypotheticals, debates, confessions, plans, memories, or completely unexpected tangents. The goal is a conversation that stays fresh for hours.
+CRITICAL: The conversation must ALWAYS move forward. NEVER suggest returning to topics already covered — they are OFF-LIMITS. NEVER suggest discussing a character's personality or traits — the characters should talk about the WORLD, not about each other's personalities. Push the conversation into genuinely new territory every single segment.
+
+Your most important job is injecting SPECIFIC, CONCRETE new topics — not vague meta-suggestions like "someone changes the subject." Name the actual subject: "someone brings up a weird dream they had about being chased through a supermarket" or "someone asks the group whether they think aliens have visited Earth." Real topics that real people would bring up sitting around talking.
+
+Think about: random memories, hypothetical scenarios, things in the news, debates about everyday life, confessions, plans, childhood stories, unpopular opinions, travel stories, weird facts, relationship drama, work stories, philosophical questions, funny observations.
 
 Return a JSON object:
 {
   "emotionalLandscape": { "Person A": "description", "Person B": "description", ... },
-  "suggestions": ["suggestion 1", "suggestion 2", ...]
+  "suggestions": ["suggestion 1", "suggestion 2", ...],
+  "newTopic": "a specific, concrete topic for someone to bring up naturally"
 }
 
-Keep suggestions to 2-4 items. Write them as natural nudges, not rigid commands. The AI writing the conversation can ignore them if the flow calls for it.
+Keep suggestions to 2-4 items. The "newTopic" field is REQUIRED — it must be a specific subject that has NOT been covered before, described concretely enough that the writer knows exactly what to have someone bring up. Write suggestions as natural nudges, not rigid commands.
 
 Return ONLY the JSON object.`,
         cache_control: { type: 'ephemeral' },
@@ -117,9 +122,13 @@ Write the direction for the next segment.`,
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+      const suggestions = parsed.suggestions ?? [];
+      if (parsed.newTopic) {
+        suggestions.push(`Someone naturally brings up ${parsed.newTopic}`);
+      }
       return {
         emotionalLandscape: parsed.emotionalLandscape ?? {},
-        suggestions: parsed.suggestions ?? [],
+        suggestions,
         topicSeeds: [],
         targetTurnCount,
       };
@@ -131,22 +140,116 @@ Write the direction for the next segment.`,
 
 export const AI_DIRECTOR_INTERVAL = 3;
 
-const TOPIC_DRIFTS = [
-  'Someone brings up something completely unrelated that just popped into their head',
-  'A random observation about their surroundings sparks a new tangent',
-  'Someone shares a story from their week that has nothing to do with what they were talking about',
-  'The conversation hits a natural lull and someone changes the subject entirely',
-  'Someone remembers something they wanted to tell the group about',
-  'A passing thought derails the current topic into something unexpected',
-  'Someone asks the group a random question out of nowhere',
-  'An old memory surfaces and someone shares it, shifting the whole conversation',
-  'Someone brings up something they read, watched, or heard recently',
-  'A small disagreement fizzles out and someone pivots to a lighter subject',
-  'Someone mentions a plan or idea they have been thinking about',
-  'The group gets into a hypothetical or "what would you do" scenario',
-  'Someone confesses something minor or embarrassing, taking things in a new direction',
-  'A joke or offhand comment accidentally opens up a deeper conversation',
-  'Someone asks for advice about something unrelated to the current topic',
+const CONCRETE_TOPICS = [
+  'a weird dream someone had last night',
+  'the best meal they ever had and where it was',
+  'whether they could survive alone in the wilderness for a week',
+  'a conspiracy theory that actually makes them think',
+  'the most embarrassing thing that happened to them in public',
+  'what they would do with an extra hour every day',
+  'a skill they wish they had learned when they were younger',
+  'the strangest job they ever had or heard about',
+  'whether time travel would actually be worth the risk',
+  'a place they have always wanted to visit but never have',
+  'the worst advice someone gave them that they actually followed',
+  'what their life would look like if they had made one different decision',
+  'an animal they think is underrated',
+  'whether they think aliens have visited Earth',
+  'a book, movie, or show that genuinely changed how they think',
+  'the most useless talent they have',
+  'what the world will look like in fifty years',
+  'a habit they cannot break no matter how hard they try',
+  'the best or worst neighbor they have ever had',
+  'whether they would rather know the future or change the past',
+  'a food combination that sounds disgusting but actually works',
+  'the oldest thing they own and why they still have it',
+  'what they would do if they won an absurd amount of money',
+  'a time they were completely wrong about someone',
+  'whether they believe in luck or think everything is cause and effect',
+  'the scariest experience they have ever had',
+  'a trend they absolutely do not understand',
+  'what they think happens after you die',
+  'the funniest misunderstanding they have been part of',
+  'a hill they would die on that nobody else cares about',
+  'whether they would want to be famous and for what',
+  'the most overrated thing in modern life',
+  'a random act of kindness they witnessed or did',
+  'what superpower would actually be the most practical',
+  'a childhood memory that feels like it happened to someone else',
+  'whether they would live on Mars if they could never come back',
+  'the weirdest thing they have ever eaten',
+  'a teacher or mentor who shaped who they are',
+  'what they think their friends really think of them',
+  'whether social media has made people better or worse',
+  'a recurring argument they have with someone close to them',
+  'the most beautiful place they have ever seen',
+  'whether AI is going to take their job someday',
+  'a guilty pleasure they would never admit to most people',
+  'what era they would want to live in if they could pick',
+  'the worst date or social event they have been to',
+  'a house rule they grew up with that they later realized was weird',
+  'whether they would clone their pet if they could',
+  'the most physically challenging thing they have done',
+  'what they would teach a class on if they had to',
+  'a mystery or unsolved case that fascinates them',
+  'whether they think humanity is getting smarter or dumber',
+  'the longest they have gone without sleep and what happened',
+  'a piece of technology they refuse to use',
+  'what their ideal retirement looks like',
+  'the worst movie they have sat through to the end',
+  'whether they would want to read minds if it meant hearing everything',
+  'a time they had to pretend to like something they hated',
+  'what their younger self would think of their life now',
+  'a local legend or urban myth from where they grew up',
+  'whether they think people can truly change',
+  'the most spontaneous thing they have ever done',
+  'a fear they had as a kid that seems ridiculous now',
+  'what they would put in a time capsule for a hundred years from now',
+  'the best concert, show, or live event they have been to',
+  'whether it is better to be smart or to be kind',
+  'a job they think does not get enough respect',
+  'the funniest thing a kid ever said to them',
+  'whether they could go a full year without their phone',
+  'a historical figure they would want to have dinner with',
+  'the most interesting stranger they have ever talked to',
+  'what language they would learn instantly if they could',
+  'a tradition they have that other people find strange',
+  'whether it is possible to be truly selfless',
+  'the worst injury they have ever had and how it happened',
+  'something they believed for way too long before finding out it was wrong',
+  'what they would name a bar or restaurant if they opened one',
+  'a song that brings back a specific vivid memory',
+  'whether they think there is intelligent life in the ocean we have not found',
+  'the pettiest thing they have ever done',
+  'what they would do if they were invisible for a day',
+  'a moment of their life they wish they could relive',
+  'whether zoos are ethical or not',
+  'the strangest coincidence that ever happened to them',
+  'what invention they think the world still needs',
+  'a compliment someone gave them that they still think about',
+  'whether money actually buys happiness or just comfort',
+  'the worst haircut they ever had',
+  'what they would do differently if they started their career over',
+  'a phobia they have that they know is irrational',
+  'the most interesting documentary they have watched',
+  'whether they think dreams actually mean something',
+  'a hobby they picked up and dropped within a month',
+  'what they think their last words will be',
+  'the most awkward elevator or waiting room moment they experienced',
+  'whether they think there is such a thing as a soulmate',
+  'a rule or law they think is completely pointless',
+  'what their autobiography title would be',
+];
+
+const TOPIC_INTROS = [
+  'Someone randomly brings up',
+  'Out of nowhere, someone mentions',
+  'Someone suddenly asks the group about',
+  'Apropos of nothing, someone starts talking about',
+  'Someone changes the subject to',
+  'Someone remembers something and brings up',
+  'A stray thought leads someone to mention',
+  'Someone asks if anyone else has thought about',
 ];
 
 interface EmotionalSummary {
@@ -234,10 +337,15 @@ export function buildNextSegmentDirection(
     }
   }
 
-  const driftChance = Math.min(0.8, 0.3 + segmentNumber * 0.1);
+  const driftChance = Math.min(0.9, 0.4 + segmentNumber * 0.1);
   if (Math.random() < driftChance) {
-    const drift = TOPIC_DRIFTS[Math.floor(Math.random() * TOPIC_DRIFTS.length)];
-    suggestions.push(`At some point in this segment: ${drift.toLowerCase()}`);
+    const unusedTopics = CONCRETE_TOPICS.filter(t =>
+      !coveredTopics.some(ct => ct.toLowerCase().includes(t.split(' ').slice(0, 3).join(' ').toLowerCase()))
+    );
+    const topicPool = unusedTopics.length > 0 ? unusedTopics : CONCRETE_TOPICS;
+    const topic = topicPool[Math.floor(Math.random() * topicPool.length)];
+    const intro = TOPIC_INTROS[Math.floor(Math.random() * TOPIC_INTROS.length)];
+    suggestions.push(`${intro} ${topic}`);
   }
 
   if (segmentNumber > 2 && Math.random() < 0.4) {
