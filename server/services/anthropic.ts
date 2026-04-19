@@ -151,7 +151,7 @@ function buildUserMessageParts(
     : '';
 
   directionParts.push(`== Direction for this segment ==
-Write the next ${directorInput.targetTurnCount} turns of conversation.
+Write EXACTLY ${directorInput.targetTurnCount} turns of conversation. Do not stop early — you must reach ${directorInput.targetTurnCount} turns. If the conversation hits a lull, have someone bring up something new. Keep going until you have written all ${directorInput.targetTurnCount} turns.
 
 Current emotional landscape:
 ${landscapeLines || '- Everyone is relaxed and in a good mood'}
