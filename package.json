@@ -1,7 +1,7 @@
 {
   "name": "stichomythia",
   "private": true,
-  "version": "1.15.1",
+  "version": "1.16.0",
   "description": "AI conversation generator with TTS audio rendering",
   "author": "Malevolent Gods Software",
   "type": "module",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource/cinzel": "^5.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",

@@ -1,10 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/orbitron/400.css";
-@import "@fontsource/orbitron/500.css";
-@import "@fontsource/orbitron/600.css";
-@import "@fontsource/orbitron/700.css";
+@import "@fontsource/cinzel/400.css";
+@import "@fontsource/cinzel/500.css";
+@import "@fontsource/cinzel/600.css";
+@import "@fontsource/cinzel/700.css";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
@@ -13,7 +13,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: 'Orbitron', sans-serif;
+    --font-heading: 'Cinzel', serif;
     --font-sans: 'Inter', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -46,9 +46,10 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --color-neon-cyan: #00E0FF;
-    --color-signal-magenta: #D61C7F;
-    --color-deep-violet: #3A1761;
+    --color-gold: #D4A843;
+    --color-gold-light: #E8C76A;
+    --color-gold-dim: #8B7335;
+    --color-gold-muted: rgba(212, 168, 67, 0.15);
     --color-ember-orange: #FF9A00;
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
@@ -60,72 +61,72 @@
 }
 
 :root {
-    --background: #f8f9fc;
-    --foreground: #0B0F19;
+    --background: #f8f6f0;
+    --foreground: #1a1814;
     --card: #ffffff;
-    --card-foreground: #0B0F19;
+    --card-foreground: #1a1814;
     --popover: #ffffff;
-    --popover-foreground: #0B0F19;
-    --primary: #3A1761;
-    --primary-foreground: #f0e8f7;
-    --secondary: #f0e8f7;
-    --secondary-foreground: #3A1761;
-    --muted: #eee8f5;
-    --muted-foreground: #6b6280;
-    --accent: #eee8f5;
-    --accent-foreground: #3A1761;
+    --popover-foreground: #1a1814;
+    --primary: #8B6914;
+    --primary-foreground: #faf6eb;
+    --secondary: #f5f0e4;
+    --secondary-foreground: #5a4a1e;
+    --muted: #f0ebe0;
+    --muted-foreground: #7a7060;
+    --accent: #f0ebe0;
+    --accent-foreground: #5a4a1e;
     --destructive: oklch(0.577 0.245 27.325);
-    --border: #e0d8eb;
-    --input: #e0d8eb;
-    --ring: #3A1761;
-    --chart-1: #3A1761;
-    --chart-2: #D61C7F;
-    --chart-3: #00E0FF;
-    --chart-4: #FF9A00;
-    --chart-5: #0B0F19;
+    --border: #e0d8c8;
+    --input: #e0d8c8;
+    --ring: #8B6914;
+    --chart-1: #D4A843;
+    --chart-2: #8B6914;
+    --chart-3: #C4956A;
+    --chart-4: #6B8E7B;
+    --chart-5: #1a1814;
     --radius: 0.5rem;
-    --sidebar: #f0e8f7;
-    --sidebar-foreground: #0B0F19;
-    --sidebar-primary: #3A1761;
-    --sidebar-primary-foreground: #f0e8f7;
-    --sidebar-accent: #eee8f5;
-    --sidebar-accent-foreground: #3A1761;
-    --sidebar-border: #e0d8eb;
-    --sidebar-ring: #3A1761;
+    --sidebar: #f5f0e4;
+    --sidebar-foreground: #1a1814;
+    --sidebar-primary: #8B6914;
+    --sidebar-primary-foreground: #faf6eb;
+    --sidebar-accent: #f0ebe0;
+    --sidebar-accent-foreground: #5a4a1e;
+    --sidebar-border: #e0d8c8;
+    --sidebar-ring: #8B6914;
 }
 
 .dark {
-    --background: #0B0F19;
-    --foreground: #e8eaf0;
-    --card: #111827;
-    --card-foreground: #e8eaf0;
-    --popover: #111827;
-    --popover-foreground: #e8eaf0;
-    --primary: #00E0FF;
-    --primary-foreground: #0B0F19;
-    --secondary: #1e1535;
-    --secondary-foreground: #e8eaf0;
-    --muted: #1a1230;
-    --muted-foreground: #8b8da3;
-    --accent: #1e1535;
-    --accent-foreground: #e8eaf0;
+    --background: #0a0a08;
+    --foreground: #e8e4d8;
+    --card: #121210;
+    --card-foreground: #e8e4d8;
+    --popover: #121210;
+    --popover-foreground: #e8e4d8;
+    --primary: #D4A843;
+    --primary-foreground: #0a0a08;
+    --secondary: #1a1810;
+    --secondary-foreground: #e8e4d8;
+    --muted: #161412;
+    --muted-foreground: #8a8478;
+    --accent: #1a1810;
+    --accent-foreground: #e8e4d8;
     --destructive: oklch(0.704 0.191 22.216);
-    --border: rgba(255, 255, 255, 0.08);
-    --input: rgba(255, 255, 255, 0.12);
-    --ring: #00E0FF;
-    --chart-1: #00E0FF;
-    --chart-2: #D61C7F;
-    --chart-3: #3A1761;
-    --chart-4: #FF9A00;
-    --chart-5: #e8eaf0;
-    --sidebar: #111827;
-    --sidebar-foreground: #e8eaf0;
-    --sidebar-primary: #00E0FF;
-    --sidebar-primary-foreground: #0B0F19;
-    --sidebar-accent: #1e1535;
-    --sidebar-accent-foreground: #e8eaf0;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
-    --sidebar-ring: #00E0FF;
+    --border: rgba(212, 168, 67, 0.12);
+    --input: rgba(212, 168, 67, 0.15);
+    --ring: #D4A843;
+    --chart-1: #D4A843;
+    --chart-2: #E8C76A;
+    --chart-3: #8B7335;
+    --chart-4: #C4956A;
+    --chart-5: #e8e4d8;
+    --sidebar: #0e0e0c;
+    --sidebar-foreground: #e8e4d8;
+    --sidebar-primary: #D4A843;
+    --sidebar-primary-foreground: #0a0a08;
+    --sidebar-accent: #1a1810;
+    --sidebar-accent-foreground: #e8e4d8;
+    --sidebar-border: rgba(212, 168, 67, 0.12);
+    --sidebar-ring: #D4A843;
 }
 
 @layer base {
@@ -140,13 +141,43 @@
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
   .app-drag-region {
     -webkit-app-region: drag;
   }
   .no-drag {
     -webkit-app-region: no-drag;
+  }
+}
+
+@layer components {
+  .glow-gold {
+    box-shadow: 0 0 12px rgba(212, 168, 67, 0.25), 0 0 4px rgba(212, 168, 67, 0.15);
+  }
+  .glow-gold-strong {
+    box-shadow: 0 0 20px rgba(212, 168, 67, 0.35), 0 0 8px rgba(212, 168, 67, 0.2);
+  }
+  .glow-gold-text {
+    text-shadow: 0 0 12px rgba(212, 168, 67, 0.4);
+  }
+  .border-gold-glow {
+    border-color: rgba(212, 168, 67, 0.3);
+    box-shadow: inset 0 0 12px rgba(212, 168, 67, 0.05), 0 0 8px rgba(212, 168, 67, 0.1);
+  }
+  .gradient-gold {
+    background: linear-gradient(135deg, #D4A843 0%, #E8C76A 50%, #D4A843 100%);
+  }
+  .gradient-dark-gold {
+    background: linear-gradient(180deg, rgba(212, 168, 67, 0.08) 0%, transparent 100%);
+  }
+  .sidebar-item {
+    @apply flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs transition-all duration-200 cursor-pointer;
+  }
+  .sidebar-item-active {
+    @apply bg-gold-muted text-gold border border-gold/20 glow-gold;
+  }
+  .sidebar-item-inactive {
+    @apply text-muted-foreground hover:text-gold-light hover:bg-gold-muted/50 border border-transparent;
   }
 }

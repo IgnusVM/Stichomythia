@@ -12,7 +12,7 @@ export function NavBar() {
   const location = useLocation();
 
   return (
-    <header className="border-b border-border bg-card/80 backdrop-blur-sm app-drag-region">
+    <header className="border-b border-gold/10 bg-card/80 backdrop-blur-sm app-drag-region">
       <div className="flex items-center justify-between px-6 h-20">
         <div className="flex items-center gap-8 no-drag">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -29,10 +29,10 @@ export function NavBar() {
                 <Link
                   key={to}
                   to={to}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all duration-200 ${
                     active
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                      ? 'bg-gold-muted text-gold glow-gold-text'
+                      : 'text-muted-foreground hover:text-gold-light hover:bg-gold-muted/50'
                   }`}
                 >
                   <Icon className="w-4 h-4" />

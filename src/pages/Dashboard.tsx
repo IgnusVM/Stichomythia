@@ -31,11 +31,21 @@ export function Dashboard() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Your Conversations</h1>
-        <Button onClick={() => setShowNew(true)}>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-heading tracking-wider text-foreground">
+            Your Conversations
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {conversations.length} dialogue{conversations.length !== 1 ? 's' : ''} in progress
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowNew(true)}
+          className="gradient-gold text-black font-semibold glow-gold hover:glow-gold-strong transition-all duration-300"
+        >
           <Plus className="w-4 h-4 mr-2" />
-          New
+          New Conversation
         </Button>
       </div>
 
@@ -43,12 +53,12 @@ export function Dashboard() {
         {conversations.map((conv) => (
           <Card
             key={conv.id}
-            className="cursor-pointer hover:border-foreground/20 transition-colors group"
+            className="cursor-pointer transition-all duration-300 hover:border-gold/30 hover:glow-gold group border-gold/8"
             onClick={() => navigate(`/conversation/${conv.id}`)}
           >
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
-                <h3 className="font-medium mb-2">{conv.name}</h3>
+                <h3 className="font-heading text-sm tracking-wide mb-2">{conv.name}</h3>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -65,26 +75,28 @@ export function Dashboard() {
                 <span>{conv.totalTurns} turns</span>
                 {conv.totalDurationMs && (
                   <>
-                    <span>·</span>
+                    <span className="text-gold/30">&middot;</span>
                     <span>
                       {Math.round(conv.totalDurationMs / 60000)}m audio
                     </span>
                   </>
                 )}
               </div>
-              <Badge variant="secondary">{conv.status}</Badge>
+              <Badge variant="secondary" className="border-gold/15 bg-gold-muted text-gold-dim dark:text-gold-light text-[10px]">
+                {conv.status}
+              </Badge>
             </CardContent>
           </Card>
         ))}
 
         <Card
-          className="cursor-pointer border-dashed hover:border-foreground/20 transition-colors"
+          className="cursor-pointer border-dashed border-gold/15 hover:border-gold/30 hover:glow-gold transition-all duration-300"
           onClick={() => setShowNew(true)}
         >
           <CardContent className="p-5 flex items-center justify-center min-h-[120px]">
             <div className="text-center text-muted-foreground">
-              <Plus className="w-8 h-8 mx-auto mb-2" />
-              <span>Create New</span>
+              <Plus className="w-8 h-8 mx-auto mb-2 text-gold/40" />
+              <span className="text-sm">Create New</span>
             </div>
           </CardContent>
         </Card>
@@ -100,7 +112,7 @@ export function Dashboard() {
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="border-gold/15">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
             <AlertDialogDescription>

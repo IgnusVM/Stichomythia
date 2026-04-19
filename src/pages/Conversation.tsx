@@ -4,14 +4,32 @@ import { api } from '@/lib/api';
 import type { Conversation as ConversationType, Character } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft } from 'lucide-react';
+import {
+  ArrowLeft,
+  MessageSquare,
+  Volume2,
+  Speaker,
+  Download,
+} from 'lucide-react';
 import { GenerateTab } from '@/components/generation/GenerateTab';
 import { EmptyState } from '@/components/generation/EmptyState';
 import { AudioTab } from '@/components/audio/AudioTab';
 import { ExportTab } from '@/components/export/ExportTab';
 import { SpeakersTab } from '@/components/speakers/SpeakersTab';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type Tab = 'generate' | 'audio' | 'speakers' | 'export';
+
+const sidebarItems: { id: Tab; label: string; icon: typeof MessageSquare }[] = [
+  { id: 'generate', label: 'Generate', icon: MessageSquare },
+  { id: 'audio', label: 'Audio', icon: Volume2 },
+  { id: 'speakers', label: 'Speakers', icon: Speaker },
+  { id: 'export', label: 'Export', icon: Download },
+];
 
 export function ConversationPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,79 +64,96 @@ export function ConversationPage() {
   const hasSegments = conversation.segments.length > 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
-      <div className="border-b px-6 py-3 flex items-center gap-4 shrink-0">
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Dashboard
-          </Link>
-        </Button>
-        <h1 className="text-lg font-semibold">{conversation.name}</h1>
-        <div className="flex items-center gap-1.5">
-          {convCharacters.map(c => (
-            <div
-              key={c.id}
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: c.color }}
-            />
+    <div className="flex h-[calc(100vh-5rem)]">
+      {hasSegments && (
+        <aside className="w-20 border-r border-gold/10 bg-card/50 flex flex-col items-center py-4 gap-1 shrink-0">
+          {sidebarItems.map(({ id: itemId, label, icon: Icon }) => (
+            <Tooltip key={itemId} delayDuration={300}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTab(itemId)}
+                  className={`sidebar-item w-16 ${
+                    tab === itemId ? 'sidebar-item-active' : 'sidebar-item-inactive'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="font-medium tracking-wide">{label}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="bg-card border-gold/20">
+                {label}
+              </TooltipContent>
+            </Tooltip>
           ))}
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {conversation.totalTurns} turns
-        </span>
-        <Badge variant="secondary">{conversation.status}</Badge>
 
-        {hasSegments && (
-          <div className="ml-auto flex gap-1">
-            {(['generate', 'audio', 'speakers', 'export'] as Tab[]).map(t => (
-              <Button
-                key={t}
-                variant={tab === t ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setTab(t)}
-                className="capitalize"
-              >
-                {t}
-              </Button>
-            ))}
+          <div className="mt-auto flex flex-col items-center gap-3 pb-2">
+            <div className="flex flex-col items-center gap-1">
+              {convCharacters.map(c => (
+                <div
+                  key={c.id}
+                  className="w-2.5 h-2.5 rounded-full ring-1 ring-white/10"
+                  style={{ backgroundColor: c.color }}
+                />
+              ))}
+            </div>
+            <span className="text-[10px] text-muted-foreground">
+              {conversation.totalTurns}
+            </span>
           </div>
-        )}
-      </div>
+        </aside>
+      )}
 
-      <div className="flex-1 overflow-hidden">
-        {!hasSegments ? (
-          <EmptyState
-            conversation={conversation}
-            characters={convCharacters}
-            onConversationUpdate={handleConversationUpdate}
-          />
-        ) : tab === 'generate' ? (
-          <GenerateTab
-            conversation={conversation}
-            characters={convCharacters}
-            onConversationUpdate={handleConversationUpdate}
-            showSampleBanner={showSampleBanner}
-            onSampleBannerDismiss={() => setShowSampleBanner(false)}
-          />
-        ) : tab === 'audio' ? (
-          <AudioTab
-            conversation={conversation}
-            characters={convCharacters}
-            onConversationUpdate={handleConversationUpdate}
-          />
-        ) : tab === 'speakers' ? (
-          <SpeakersTab
-            conversation={conversation}
-            characters={convCharacters}
-            onConversationUpdate={handleConversationUpdate}
-          />
-        ) : (
-          <ExportTab
-            conversation={conversation}
-            characters={convCharacters}
-          />
-        )}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="border-b border-gold/10 px-5 py-2.5 flex items-center gap-3 shrink-0 gradient-dark-gold">
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-gold-light">
+            <Link to="/">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back
+            </Link>
+          </Button>
+          <div className="h-4 w-px bg-gold/15" />
+          <h1 className="text-base font-heading tracking-wider text-foreground">
+            {conversation.name}
+          </h1>
+          <Badge variant="secondary" className="text-[10px] border-gold/15 bg-gold-muted text-gold-dim dark:text-gold-light">
+            {conversation.status}
+          </Badge>
+        </div>
+
+        <div className="flex-1 overflow-hidden">
+          {!hasSegments ? (
+            <EmptyState
+              conversation={conversation}
+              characters={convCharacters}
+              onConversationUpdate={handleConversationUpdate}
+            />
+          ) : tab === 'generate' ? (
+            <GenerateTab
+              conversation={conversation}
+              characters={convCharacters}
+              onConversationUpdate={handleConversationUpdate}
+              showSampleBanner={showSampleBanner}
+              onSampleBannerDismiss={() => setShowSampleBanner(false)}
+            />
+          ) : tab === 'audio' ? (
+            <AudioTab
+              conversation={conversation}
+              characters={convCharacters}
+              onConversationUpdate={handleConversationUpdate}
+            />
+          ) : tab === 'speakers' ? (
+            <SpeakersTab
+              conversation={conversation}
+              characters={convCharacters}
+              onConversationUpdate={handleConversationUpdate}
+            />
+          ) : (
+            <ExportTab
+              conversation={conversation}
+              characters={convCharacters}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
