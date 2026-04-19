@@ -16,8 +16,8 @@ export function NavBar() {
       <div className="flex items-center justify-between px-6 h-20">
         <div className="flex items-center gap-8 no-drag">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <img src="/logo.png" alt="" className="h-14 w-auto" />
-            <img src="/title.png" alt="Stichomythia" className="h-8" />
+            <img src="/logo.png" alt="" className="h-28 w-auto -my-8" />
+            <img src="/title.png" alt="Stichomythia" className="h-10" />
           </Link>
           <nav className="flex items-center gap-1">
             {navItems.map(({ to, label, icon: Icon }) => {
