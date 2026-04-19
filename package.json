@@ -1,8 +1,8 @@
 {
   "name": "stichomythia",
   "private": true,
-  "version": "2.3.0",
-  "description": "AI conversation generator with TTS audio rendering",
+  "version": "2.3.1",
+  "description": "Multi-speaker Bluetooth audio platform with AI conversations, stem player, and system audio routing",
   "author": "Malevolent Gods Software",
   "type": "module",
   "main": "dist-electron/main.js",
@@ -70,10 +70,16 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stichomythia",
+      "uninstallDisplayName": "Stichomythia",
       "installerIcon": "build/installer.ico",
       "uninstallerIcon": "build/installer.ico",
       "installerHeaderIcon": "build/installer.ico",
-      "installerSidebar": "build/installerSidebar.bmp"
+      "installerSidebar": "build/installerSidebar.bmp",
+      "deleteAppDataOnUninstall": false
     },
     "publish": null,
     "copyright": "Copyright © 2026 Malevolent Gods Software"

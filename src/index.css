@@ -175,7 +175,8 @@
     @apply flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs transition-all duration-200 cursor-pointer;
   }
   .sidebar-item-active {
-    @apply bg-gold-muted text-gold border border-gold/20 glow-gold;
+    @apply bg-gold-muted text-gold border border-gold/20;
+    box-shadow: 0 0 12px rgba(212, 168, 67, 0.25), 0 0 4px rgba(212, 168, 67, 0.15);
   }
   .sidebar-item-inactive {
     @apply text-muted-foreground hover:text-gold-light hover:bg-gold-muted/50 border border-transparent;

@@ -214,10 +214,8 @@ export class AudioEngine {
   createSourceFromElement(speakerId: string, element: HTMLMediaElement): MediaElementAudioSourceNode | null {
     const ch = this.channels.get(speakerId);
     if (!ch) return null;
-    const source = ch.audioContext.createMediaStreamDestination
-      ? ch.audioContext.createMediaElementSource(element)
-      : null;
-    if (source) source.connect(ch.inputNode);
+    const source = ch.audioContext.createMediaElementSource(element);
+    source.connect(ch.inputNode);
     return source;
   }
 

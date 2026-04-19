@@ -13,7 +13,7 @@ interface Props {
   onRemove: () => void;
 }
 
-export function SpeakerCard({ speaker, index, connected, onTest, onUpdateLabel, onRemove }: Props) {
+export function SpeakerCard({ speaker, index: _index, connected, onTest, onUpdateLabel, onRemove }: Props) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(speaker.label);
   const [testing, setTesting] = useState(false);

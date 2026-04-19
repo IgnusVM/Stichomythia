@@ -20,7 +20,7 @@ function createEmptyStem(): StemState {
 }
 
 export function StemPlayer() {
-  const { engine, speakers } = useAudioEngine();
+  const { engine } = useAudioEngine();
   const [stems, setStems] = useState<StemState[]>(() =>
     Array.from({ length: STEM_COUNT }, createEmptyStem)
   );

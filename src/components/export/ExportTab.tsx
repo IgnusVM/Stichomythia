@@ -14,7 +14,7 @@ interface Props {
   characters: Character[];
 }
 
-export function ExportTab({ conversation, characters }: Props) {
+export function ExportTab({ conversation }: Props) {
   const [exporting, setExporting] = useState(false);
   const [log, setLog] = useState<ExportEvent[]>([]);
   const [result, setResult] = useState<{

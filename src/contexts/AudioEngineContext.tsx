@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { AudioEngine } from '@/lib/audio-engine';
 import type { ChannelState } from '@/lib/audio-engine';
 import type { Speaker, MixerState, ChannelMixerState, EQBandSettings } from '@/types';
-import { DEFAULT_EQ_BANDS } from '@/types';
+
 import { api } from '@/lib/api';
 import { useAudioDevices } from '@/hooks/useAudioDevices';
 
@@ -41,7 +41,6 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [mixerExpanded, setMixerExpanded] = useState(false);
   const [mixerState, setMixerState] = useState<MixerState>({ masterVolume: 1, channels: [] });
-  const [, forceUpdate] = useState(0);
   const { devices } = useAudioDevices();
 
   const connectedDeviceIds = new Set(devices.map(d => d.deviceId));

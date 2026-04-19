@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
-import { Button } from '@/components/ui/button';
 import { Volume2 } from 'lucide-react';
 import {
   Popover,
@@ -9,7 +8,7 @@ import {
 } from '@/components/ui/popover';
 import { LevelMeter } from './LevelMeter';
 import { EQControl } from './EQControl';
-import type { Speaker, EQBandSettings } from '@/types';
+import type { Speaker } from '@/types';
 import { useAudioEngine } from '@/contexts/AudioEngineContext';
 
 interface Props {

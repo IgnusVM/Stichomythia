@@ -19,7 +19,7 @@ export function AudioTab({ conversation, characters, onConversationUpdate }: Pro
   const [activeTurnIndex, setActiveTurnIndex] = useState(-1);
   const [approving, setApproving] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
-  const { speakers, engine } = useAudioEngine();
+  const { speakers } = useAudioEngine();
   const turnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
 

@@ -18,7 +18,7 @@ export function ConversationPlayer({ turns, characters, speakerDeviceMap, onTurn
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speakerMapRef = useRef(speakerDeviceMap);
-  const playTurnRef = useRef<(index: number) => Promise<void>>();
+  const playTurnRef = useRef<(index: number) => Promise<void>>(undefined);
 
   speakerMapRef.current = speakerDeviceMap;
 
