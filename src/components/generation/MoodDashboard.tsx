@@ -45,7 +45,7 @@ export function MoodDashboard({ emotionalSummary, characters, characterIds }: Pr
           <span className="font-medium">Threads: </span>
           {emotionalSummary.unresolvedThreads.map((t, i) => (
             <span key={i}>
-              &ldquo;{t}&rdquo;
+              &ldquo;{typeof t === 'object' ? (t as any).thread ?? JSON.stringify(t) : t}&rdquo;
               {i < emotionalSummary.unresolvedThreads.length - 1 ? ', ' : ''}
             </span>
           ))}

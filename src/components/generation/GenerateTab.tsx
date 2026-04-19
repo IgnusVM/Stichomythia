@@ -318,7 +318,9 @@ export function GenerateTab({ conversation, characters, onConversationUpdate, sh
             <h4 className="text-sm font-medium mb-2">Unresolved Threads</h4>
             <div className="space-y-1">
               {lastSegment.emotionalSummary.unresolvedThreads.map((thread, i) => (
-                <p key={i} className="text-xs text-muted-foreground">{thread}</p>
+                <p key={i} className="text-xs text-muted-foreground">
+                  {typeof thread === 'object' ? (thread as any).thread ?? JSON.stringify(thread) : thread}
+                </p>
               ))}
               {lastSegment.emotionalSummary.unresolvedThreads.length === 0 && (
                 <p className="text-xs text-muted-foreground">None</p>
