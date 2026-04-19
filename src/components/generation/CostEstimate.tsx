@@ -19,7 +19,7 @@ const PRICING = {
   },
 };
 
-export function CostEstimate({ model, mode, segmentCount, turnsPerSegment, existingSegments }: Props) {
+export function CostEstimate({ model, mode, segmentCount, turnsPerSegment }: Props) {
   const pricing = PRICING[model as keyof typeof PRICING] ?? PRICING['claude-opus-4-6'];
   const batchMultiplier = mode === 'batch' ? 0.5 : 1;
 

@@ -3,7 +3,7 @@ import { api } from '@/lib/api';
 import type { Conversation, Character } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Play, Loader2 } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { SampleProgress } from './SampleProgress';
 
 interface Props {

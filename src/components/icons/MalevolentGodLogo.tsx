@@ -77,7 +77,6 @@ export function MalevolentGodLogo(props: SVGProps<SVGSVGElement>) {
       <path fill="none" stroke="currentColor" strokeWidth="5" strokeMiterlimit="10" d="M1860.26,1786.99c-5.6,5.33-11.2,10.67-16.8,16"/>
       <path fill="none" stroke="currentColor" strokeWidth="4" strokeMiterlimit="10" d="M1324.39,1946.27c6.29,6.93,14.81,15.01,25.91,22.65,7.54,5.18,14.75,9.12,21.16,12.12"/>
       <path fill="none" stroke="currentColor" strokeWidth="5" strokeMiterlimit="10" d="M1174.53,1580.24c11.99,9.06,23.98,18.12,35.98,27.18"/>
-      </g>
     </svg>
   )
 }

@@ -183,7 +183,7 @@ export function GenerateTab({ conversation, characters, onConversationUpdate, sh
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Mode:</span>
-            <Select value={mode} onValueChange={(v) => setMode(v)}>
+            <Select value={mode} onValueChange={(v) => setMode(v as "live" | "batch")}>
               <SelectTrigger className="w-28">
                 <SelectValue />
               </SelectTrigger>

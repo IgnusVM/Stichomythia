@@ -1,6 +1,6 @@
 import type { Turn, Character } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Play, RotateCw, Loader2 } from 'lucide-react';
+import { Play, RotateCw } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 interface Props {

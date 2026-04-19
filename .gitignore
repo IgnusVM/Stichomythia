@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Build output
+dist-electron/
+dist-server/
+release/
+
 # App data
 data/
 exports/
