@@ -4,6 +4,15 @@ import os from 'os';
 
 function getAppDataRoot(): string {
   if (process.env.STICHOMYTHIA_DATA) return process.env.STICHOMYTHIA_DATA;
+  const docs = process.platform === 'win32'
+    ? path.join(os.homedir(), 'Documents')
+    : process.platform === 'darwin'
+      ? path.join(os.homedir(), 'Documents')
+      : os.homedir();
+  return path.join(docs, 'Stichomythia');
+}
+
+function getLegacyDataRoot(): string {
   const appData = process.env.APPDATA
     || (process.platform === 'darwin'
       ? path.join(os.homedir(), 'Library', 'Application Support')
@@ -18,7 +27,32 @@ export async function ensureDir(dir: string): Promise<void> {
   await fs.mkdir(dir, { recursive: true });
 }
 
+async function migrateFromLegacy(): Promise<void> {
+  const legacyDir = getLegacyDataRoot();
+  try {
+    await fs.access(legacyDir);
+  } catch {
+    return;
+  }
+
+  try {
+    await fs.access(path.join(DATA_DIR, 'settings.json'));
+    return;
+  } catch {}
+
+  console.log(`[server] Migrating data from ${legacyDir} to ${DATA_DIR}`);
+  await ensureDir(DATA_DIR);
+  const entries = await fs.readdir(legacyDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const src = path.join(legacyDir, entry.name);
+    const dest = path.join(DATA_DIR, entry.name);
+    await fs.cp(src, dest, { recursive: true });
+  }
+  console.log(`[server] Migration complete`);
+}
+
 export async function ensureDataDirs(): Promise<void> {
+  await migrateFromLegacy();
   await Promise.all([
     ensureDir(path.join(DATA_DIR, 'characters')),
     ensureDir(path.join(DATA_DIR, 'conversations')),
