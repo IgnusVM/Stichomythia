@@ -144,13 +144,17 @@ export const api = {
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7);
           } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            switch (currentEvent) {
-              case 'chunk': handlers.onChunk?.(data.text, data.segmentIndex); break;
-              case 'segment_start': handlers.onSegmentStart?.(data.segmentIndex, data.segmentNumber); break;
-              case 'segment_complete': handlers.onSegmentComplete?.(data); break;
-              case 'complete': handlers.onComplete?.(data); break;
-              case 'error': handlers.onError?.(data.message); break;
+            try {
+              const data = JSON.parse(line.slice(6));
+              switch (currentEvent) {
+                case 'chunk': handlers.onChunk?.(data.text, data.segmentIndex); break;
+                case 'segment_start': handlers.onSegmentStart?.(data.segmentIndex, data.segmentNumber); break;
+                case 'segment_complete': handlers.onSegmentComplete?.(data); break;
+                case 'complete': handlers.onComplete?.(data); break;
+                case 'error': handlers.onError?.(data.message); break;
+              }
+            } catch (e) {
+              console.warn('SSE parse error, skipping line:', e);
             }
           }
         }
@@ -224,12 +228,16 @@ export const api = {
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7);
           } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            switch (currentEvent) {
-              case 'chunk': handlers.onChunk?.(data.text, data.segmentIndex); break;
-              case 'segment_complete': handlers.onSegmentComplete?.(data); break;
-              case 'complete': handlers.onComplete?.(data); break;
-              case 'error': handlers.onError?.(data.message); break;
+            try {
+              const data = JSON.parse(line.slice(6));
+              switch (currentEvent) {
+                case 'chunk': handlers.onChunk?.(data.text, data.segmentIndex); break;
+                case 'segment_complete': handlers.onSegmentComplete?.(data); break;
+                case 'complete': handlers.onComplete?.(data); break;
+                case 'error': handlers.onError?.(data.message); break;
+              }
+            } catch (e) {
+              console.warn('SSE parse error, skipping line:', e);
             }
           }
         }
