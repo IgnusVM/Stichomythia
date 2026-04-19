@@ -189,7 +189,7 @@ ttsRouter.post('/preview', async (req, res) => {
 });
 
 ttsRouter.post('/render', async (req, res) => {
-  const { conversationId, segmentIds, throttleMs = 750 } = req.body;
+  const { conversationId, segmentIds, throttleMs = 750, rerenderAll = false } = req.body;
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -218,10 +218,12 @@ ttsRouter.post('/render', async (req, res) => {
 
     const turnsToRender = targetSegments
       .flatMap(s => s.turns)
-      .filter(t => t.status === 'approved' || t.status === 'edited');
+      .filter(t => rerenderAll
+        ? (t.status === 'approved' || t.status === 'edited' || t.status === 'rendered')
+        : (t.status === 'approved' || t.status === 'edited'));
 
     if (turnsToRender.length === 0) {
-      sendEvent('error', { message: 'No approved turns to render' });
+      sendEvent('error', { message: rerenderAll ? 'No turns to re-render' : 'No approved turns to render' });
       res.end();
       return;
     }

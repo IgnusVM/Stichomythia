@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import type { Conversation, Character } from '@/types';
 import { Button } from '@/components/ui/button';
-import { CheckCheck, Loader2, Volume2, AlertTriangle, Timer } from 'lucide-react';
+import { CheckCheck, Loader2, Volume2, AlertTriangle, Timer, RefreshCw } from 'lucide-react';
 import { AudioTurnRow } from './AudioTurnRow';
 import { ConversationPlayer } from './ConversationPlayer';
 
@@ -74,9 +74,11 @@ export function AudioTab({ conversation, characters, onConversationUpdate }: Pro
     setApproving(false);
   };
 
-  const handleRenderAll = async () => {
+  const handleRenderAll = (rerender = false) => doRender(rerender);
+
+  const doRender = async (rerenderAll = false) => {
     setRendering(true);
-    setRenderProgress({ done: 0, total: approvedCount });
+    setRenderProgress({ done: 0, total: rerenderAll ? allTurns.length : approvedCount });
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -85,7 +87,7 @@ export function AudioTab({ conversation, characters, onConversationUpdate }: Pro
       const res = await fetch('/api/tts/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: conversation.id }),
+        body: JSON.stringify({ conversationId: conversation.id, rerenderAll }),
         signal: abort.signal,
       });
 
@@ -203,7 +205,7 @@ export function AudioTab({ conversation, characters, onConversationUpdate }: Pro
             </Button>
           )}
 
-          <Button onClick={handleRenderAll} disabled={rendering || approvedCount === 0}>
+          <Button onClick={() => handleRenderAll(false)} disabled={rendering || approvedCount === 0}>
             {rendering ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -217,16 +219,26 @@ export function AudioTab({ conversation, characters, onConversationUpdate }: Pro
             )}
           </Button>
 
-          {allTurns.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleRecalculatePauses} disabled={recalculating || rendering}>
-              {recalculating ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <Timer className="w-4 h-4 mr-2" />
-              )}
-              Recalculate Pauses
+          {renderedCount > 0 && (
+            <Button variant="outline" onClick={() => handleRenderAll(true)} disabled={rendering}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Re-render All ({renderedCount})
             </Button>
           )}
+
+          <Button variant="outline" onClick={handleRecalculatePauses} disabled={recalculating || rendering || allTurns.length === 0}>
+            {recalculating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Recalculating...
+              </>
+            ) : (
+              <>
+                <Timer className="w-4 h-4 mr-2" />
+                Recalculate Pauses
+              </>
+            )}
+          </Button>
 
           <div className="text-sm text-muted-foreground space-x-4">
             <span>{renderedCount}/{allTurns.length} rendered</span>
