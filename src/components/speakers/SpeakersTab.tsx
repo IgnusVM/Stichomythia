@@ -107,7 +107,7 @@ export function SpeakersTab({ conversation, characters, onConversationUpdate }: 
     <div className="p-6 max-w-2xl mx-auto space-y-6 overflow-y-auto h-full">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Registered Speakers</CardTitle>
+          <CardTitle className="text-lg font-heading tracking-wide">Registered Speakers</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {speakers.length === 0 ? (
@@ -130,7 +130,7 @@ export function SpeakersTab({ conversation, characters, onConversationUpdate }: 
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Add Speaker</CardTitle>
+          <CardTitle className="text-lg font-heading tracking-wide">Add Speaker</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -201,7 +201,7 @@ export function SpeakersTab({ conversation, characters, onConversationUpdate }: 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Character Mapping</CardTitle>
+            <CardTitle className="text-lg font-heading tracking-wide">Character Mapping</CardTitle>
             {allMapped && (
               <Button variant="outline" size="sm" onClick={handleTestAll} disabled={testingAll}>
                 {testingAll ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Volume2 className="w-4 h-4 mr-2" />}

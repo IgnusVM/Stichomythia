@@ -82,7 +82,7 @@ export function Dashboard() {
                   </>
                 )}
               </div>
-              <Badge variant="secondary" className="border-gold/15 bg-gold-muted text-gold-dim dark:text-gold-light text-[10px]">
+              <Badge variant="secondary" className="border-gold/15 bg-gold-muted text-gold-light text-[10px]">
                 {conv.status}
               </Badge>
             </CardContent>

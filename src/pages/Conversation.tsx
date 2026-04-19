@@ -114,7 +114,7 @@ export function ConversationPage() {
           <h1 className="text-base font-heading tracking-wider text-foreground">
             {conversation.name}
           </h1>
-          <Badge variant="secondary" className="text-[10px] border-gold/15 bg-gold-muted text-gold-dim dark:text-gold-light">
+          <Badge variant="secondary" className="text-[10px] border-gold/15 bg-gold-muted text-gold-light">
             {conversation.status}
           </Badge>
         </div>
