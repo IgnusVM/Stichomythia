@@ -5,12 +5,24 @@ import type { Conversation } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2 } from 'lucide-react';
 import { NewConversationDialog } from '@/components/dashboard/NewConversationDialog';
 
 export function Dashboard() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showNew, setShowNew] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,11 +43,24 @@ export function Dashboard() {
         {conversations.map((conv) => (
           <Card
             key={conv.id}
-            className="cursor-pointer hover:border-foreground/20 transition-colors"
+            className="cursor-pointer hover:border-foreground/20 transition-colors group"
             onClick={() => navigate(`/conversation/${conv.id}`)}
           >
             <CardContent className="p-5">
-              <h3 className="font-medium mb-2">{conv.name}</h3>
+              <div className="flex items-start justify-between">
+                <h3 className="font-medium mb-2">{conv.name}</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTarget(conv);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                 <span>{conv.totalTurns} turns</span>
                 {conv.totalDurationMs && (
@@ -73,6 +98,38 @@ export function Dashboard() {
           navigate(`/conversation/${conv.id}`);
         }}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete &ldquo;{deleteTarget?.name}&rdquo; and all its segments, audio, and export data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteTarget) return;
+                setDeleting(true);
+                try {
+                  await api.conversations.delete(deleteTarget.id);
+                  setConversations(prev => prev.filter(c => c.id !== deleteTarget.id));
+                } catch (err) {
+                  console.error('Failed to delete:', err);
+                }
+                setDeleting(false);
+                setDeleteTarget(null);
+              }}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
