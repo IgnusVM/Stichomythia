@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ApiStatus } from './ApiStatus';
-import { MessageSquare, Music, Monitor, Users, Settings } from 'lucide-react';
+import { MessageSquare, Music, Monitor, Users, Settings, Speaker } from 'lucide-react';
 
 const navItems = [
-  { to: '/', label: 'Conversations', icon: MessageSquare },
+  { to: '/conversations', label: 'Conversations', icon: MessageSquare },
   { to: '/stems', label: 'Stems', icon: Music },
   { to: '/system', label: 'System', icon: Monitor },
+  { to: '/speakers', label: 'Speakers', icon: Speaker },
   { to: '/characters', label: 'Characters', icon: Users },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -24,8 +25,8 @@ export function NavBar() {
           <nav className="flex items-center gap-1">
             {navItems.map(({ to, label, icon: Icon }) => {
               const active =
-                to === '/'
-                  ? location.pathname === '/' || location.pathname.startsWith('/conversation')
+                to === '/conversations'
+                  ? location.pathname === '/conversations' || location.pathname.startsWith('/conversation/')
                   : location.pathname.startsWith(to);
               return (
                 <Link
