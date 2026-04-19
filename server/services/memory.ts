@@ -23,10 +23,6 @@ const TIER_WORD_COUNTS = {
   old: 30,
 };
 
-export function shouldCreateMemory(segmentCount: number, interval: number): boolean {
-  return segmentCount > 0 && segmentCount % interval === 0;
-}
-
 export async function createMemoryBlock(
   segments: Segment[],
   startSegIdx: number,
@@ -91,21 +87,28 @@ export async function processMemoryAfterSegment(
 ): Promise<MemoryBlock[] | null> {
   const segmentCount = segments.length;
 
-  if (!shouldCreateMemory(segmentCount, memorySummaryInterval)) {
-    return null;
-  }
-
   const lastMemoryEnd = existingMemories.length > 0
     ? existingMemories[existingMemories.length - 1].coversSegments[1]
     : -1;
 
-  const startIdx = lastMemoryEnd + 1;
-  const endIdx = segmentCount - 1;
+  const uncoveredSegments = segmentCount - 1 - lastMemoryEnd;
+  if (uncoveredSegments < memorySummaryInterval) {
+    return null;
+  }
 
-  if (startIdx > endIdx) return null;
+  const allMemories = [...existingMemories];
+  let cursor = lastMemoryEnd + 1;
 
-  const newBlock = await createMemoryBlock(segments, startIdx, endIdx);
-  const allMemories = [...existingMemories, newBlock];
+  while (cursor + memorySummaryInterval - 1 < segmentCount) {
+    const blockEnd = cursor + memorySummaryInterval - 1;
+    const newBlock = await createMemoryBlock(segments, cursor, blockEnd);
+    allMemories.push(newBlock);
+    cursor = blockEnd + 1;
+  }
+
+  if (allMemories.length === existingMemories.length) {
+    return null;
+  }
 
   return retiereMemories(allMemories);
 }
