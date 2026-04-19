@@ -257,6 +257,7 @@ generationRouter.post('/generate', async (req, res) => {
           conversation.settings.topicSeeds,
           coveredTopics,
           conversation.settings.turnsPerSegment,
+          segNum,
         );
       }
 
@@ -615,6 +616,7 @@ generationRouter.post('/batch', async (req, res) => {
           conversation.settings.topicSeeds,
           coveredTopics,
           conversation.settings.turnsPerSegment,
+          segNum,
         );
       }
 
