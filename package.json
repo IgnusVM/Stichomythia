@@ -1,7 +1,7 @@
 {
   "name": "stichomythia",
   "private": true,
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Multi-speaker Bluetooth audio platform with AI conversations, stem player, and system audio routing",
   "author": "Malevolent Gods Software",
   "type": "module",
@@ -12,8 +12,9 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
     "build:server": "node scripts/build-server.mjs",
-    "electron:dev": "concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && tsc -p electron/tsconfig.json && npm run build:server && electron-builder",
+    "build:preload": "node scripts/build-preload.mjs",
+    "electron:dev": "npm run build:preload && concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && tsc -p electron/tsconfig.json && npm run build:preload && npm run build:server && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
   },

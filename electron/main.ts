@@ -74,7 +74,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: isDev
+        ? path.join(__dirname, '..', 'dist-electron', 'preload.js')
+        : path.join(__dirname, 'preload.js'),
     },
     show: false,
   });
