@@ -97,7 +97,21 @@ Rules:
 - Never use names. Never break character.
 - Show emotion through speech texture, not narration. Excited = faster, longer. Annoyed = clipped. Uncomfortable = hedging, trailing off.
 - Characters should interrupt, overlap, go on tangents, tell anecdotes, agree, disagree, and react naturally.
-- Vary who speaks — don't cycle through characters in order. Some characters talk more in stretches, some go quiet.`;
+- Vary who speaks — don't cycle through characters in order. Some characters talk more in stretches, some go quiet.
+
+CRITICAL — TTS-ready text:
+This dialogue will be read aloud by a text-to-speech engine. The engine reads text literally — it cannot interpret stage directions, actions, or sound effects. Follow these rules strictly:
+- NEVER write parenthetical actions like (sighs), (laughs), (clears throat), (pauses), (groans), (scoffs). The TTS will say the word "sighs" out loud.
+- NEVER write asterisk actions like *sighs*, *laughs*, *shrugs*. Same problem.
+- Express laughter as actual vocalization: "ha", "hah", "heh", "pfft", "ahaha", or weave it into speech like "oh man, that's—hah, okay."
+- Express sighing through word choice and trailing off: "yeahhh..." or "I dunno..." not "(sigh) I dunno."
+- Express hesitation with filler words: "uh", "um", "well", "I mean", "like", "you know."
+- Use ellipsis (...) for trailing off or thoughtful pauses mid-sentence.
+- Use em dashes (—) for interruptions, self-corrections, or sudden topic shifts.
+- Use short, clipped sentences for irritation. Use longer, run-on sentences for excitement.
+- Emphasis can be marked with asterisks around a single word: "that was *really* good" — TTS will stress it.
+- Small acknowledgment sounds are fine as words: "mm", "mhm", "hmm", "huh", "oh", "ah", "oof", "yikes."
+- Never write narration, sound effects in brackets, or any text that isn't meant to be spoken aloud.`;
 }
 
 function buildUserMessage(

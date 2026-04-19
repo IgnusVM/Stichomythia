@@ -247,6 +247,7 @@ ttsRouter.post('/render', async (req, res) => {
         openaiVoice: char?.voice?.openaiVoice,
         openaiModel: char?.voice?.openaiModel,
         openaiSpeed: char?.voice?.openaiSpeed,
+        moodTag: turn.moodTag,
       };
     });
 
@@ -334,6 +335,7 @@ ttsRouter.post('/rerender-turn', async (req, res) => {
         openaiVoice: char?.voice?.openaiVoice,
         openaiModel: char?.voice?.openaiModel,
         openaiSpeed: char?.voice?.openaiSpeed,
+        moodTag: targetTurn.moodTag,
       })
     : await rerenderEdge({
         text: targetTurn.text,
