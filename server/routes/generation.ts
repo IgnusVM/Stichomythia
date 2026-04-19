@@ -627,7 +627,7 @@ generationRouter.post('/batch', async (req, res) => {
 
       const recentTurns = getRecentTurnsWithLabelMap(simulatedSegments, 10, labelMap);
 
-      const { systemPrompt, userMessage } = buildSegmentPrompt(
+      const { systemPrompt, userMessageParts } = buildSegmentPrompt(
         characters, labelMap, memories, recentTurns, directorInput,
       );
 
@@ -643,7 +643,7 @@ generationRouter.post('/batch', async (req, res) => {
           }],
           messages: [{
             role: 'user' as const,
-            content: userMessage,
+            content: userMessageParts as any,
           }],
         },
       });

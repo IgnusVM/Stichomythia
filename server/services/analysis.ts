@@ -38,27 +38,17 @@ export async function analyzeSegment(segmentDialogue: string): Promise<Emotional
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: `You analyze conversation segments between four people (Person A, Person B, Person C, Person D). Return a JSON object with emotionalStates (emotion, intensity 0-1, valence -1 to 1, note), unresolvedThreads, topicsCovered, and suggestedNextDirection. Return ONLY the JSON object, no other text.`,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: [
       {
         role: 'user',
-        content: `Analyze this conversation segment between four people (Person A, Person B, Person C, Person D).
-
-${segmentDialogue}
-
-Return a JSON object with:
-{
-  "emotionalStates": {
-    "Person A": { "emotion": "...", "intensity": 0.0-1.0, "valence": -1.0 to 1.0, "note": "brief note" },
-    "Person B": { ... },
-    "Person C": { ... },
-    "Person D": { ... }
-  },
-  "unresolvedThreads": ["topics/tensions left hanging"],
-  "topicsCovered": ["what they talked about"],
-  "suggestedNextDirection": "one sentence suggestion for where the conversation could go next"
-}
-
-Return ONLY the JSON object, no other text.`,
+        content: segmentDialogue,
       },
     ],
   });
@@ -99,27 +89,17 @@ export async function summarizeForMemory(
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: `You summarize conversation segments. Focus on key topics, emotional dynamics, running jokes/callbacks/recurring themes, and unresolved tensions. Return a JSON object with summary, keyTopics, emotionalHighlights, and runningJokes. Return ONLY the JSON object.`,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: [
       {
         role: 'user',
-        content: `Summarize the following conversation segments in approximately ${targetWordCount} words. Focus on:
-1. Key topics discussed
-2. Emotional dynamics between the speakers
-3. Any running jokes, callbacks, or recurring themes
-4. Unresolved tensions or threads
-
-Conversation:
-${combined}
-
-Return a JSON object:
-{
-  "summary": "...",
-  "keyTopics": ["..."],
-  "emotionalHighlights": ["..."],
-  "runningJokes": ["..."]
-}
-
-Return ONLY the JSON object.`,
+        content: `Summarize in approximately ${targetWordCount} words:\n\n${combined}`,
       },
     ],
   });

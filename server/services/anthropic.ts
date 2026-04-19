@@ -114,22 +114,28 @@ This dialogue will be read aloud by a text-to-speech engine. The engine reads te
 - Never write narration, sound effects in brackets, or any text that isn't meant to be spoken aloud.`;
 }
 
-function buildUserMessage(
+function buildUserMessageParts(
   memories: MemoryBlock[],
   recentTurns: string[],
   directorInput: DirectorInput,
-): string {
-  const parts: string[] = [];
+): Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> {
+  const parts: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [];
 
   if (memories.length > 0) {
     const memoryText = memories
       .map(m => m.summary)
       .join('\n\n');
-    parts.push(`== What's happened so far ==\n${memoryText}`);
+    parts.push({
+      type: 'text',
+      text: `== What's happened so far ==\n${memoryText}`,
+      cache_control: { type: 'ephemeral' },
+    });
   }
 
+  const directionParts: string[] = [];
+
   if (recentTurns.length > 0) {
-    parts.push(`== Recent conversation ==\n${recentTurns.join('\n')}`);
+    directionParts.push(`== Recent conversation ==\n${recentTurns.join('\n')}`);
   }
 
   const landscapeLines = Object.entries(directorInput.emotionalLandscape)
@@ -144,7 +150,7 @@ function buildUserMessage(
     ? `\n- The topic could drift toward ${directorInput.topicSeeds[Math.floor(Math.random() * directorInput.topicSeeds.length)]} if it fits`
     : '';
 
-  parts.push(`== Direction for this segment ==
+  directionParts.push(`== Direction for this segment ==
 Write the next ${directorInput.targetTurnCount} turns of conversation.
 
 Current emotional landscape:
@@ -153,7 +159,9 @@ ${suggestionsText}${topicText}
 
 Write ONLY the conversation. No preamble, no summary, no commentary.`);
 
-  return parts.join('\n\n');
+  parts.push({ type: 'text', text: directionParts.join('\n\n') });
+
+  return parts;
 }
 
 const TURN_REGEX = /^\[Person ([A-D])\]\s*\(([^)]+)\):\s*(.+)$/;
@@ -191,10 +199,10 @@ export function buildSegmentPrompt(
   memories: MemoryBlock[],
   recentTurns: string[],
   directorInput: DirectorInput,
-): { systemPrompt: string; userMessage: string } {
+): { systemPrompt: string; userMessageParts: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> } {
   return {
     systemPrompt: buildSystemPrompt(characters, labelMap),
-    userMessage: buildUserMessage(memories, recentTurns, directorInput),
+    userMessageParts: buildUserMessageParts(memories, recentTurns, directorInput),
   };
 }
 
@@ -211,7 +219,7 @@ export interface GenerateSegmentOptions {
 export async function generateSegment(options: GenerateSegmentOptions): Promise<{ raw: string; turns: ParsedTurn[] }> {
   const client = await getClient();
   const systemPrompt = buildSystemPrompt(options.characters, options.labelMap);
-  const userMessage = buildUserMessage(options.memories, options.recentTurns, options.directorInput);
+  const userMessageParts = buildUserMessageParts(options.memories, options.recentTurns, options.directorInput);
 
   const stream = client.messages.stream({
     model: options.model,
@@ -226,7 +234,7 @@ export async function generateSegment(options: GenerateSegmentOptions): Promise<
     messages: [
       {
         role: 'user',
-        content: userMessage,
+        content: userMessageParts,
       },
     ],
   });
