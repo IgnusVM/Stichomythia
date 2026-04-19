@@ -2,7 +2,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
-import { ensureDir, getExportsDir, readJson, getSettingsPath } from '../utils/files.js';
+import { ensureDir, getExportsDir, getAudioDir, readJson, getSettingsPath } from '../utils/files.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -82,7 +82,8 @@ export async function exportConversation(options: ExportOptions): Promise<{
     const destFilename = `${seqStr}.mp3`;
     const destPath = path.join(audioExportDir, destFilename);
 
-    const srcPath = path.resolve(`.${turn.audioFile}`);
+    const relativePath = turn.audioFile!.replace(/^\/audio\//, '');
+    const srcPath = path.join(getAudioDir(), relativePath);
     try {
       await fs.copyFile(srcPath, destPath);
       filesCopied++;
