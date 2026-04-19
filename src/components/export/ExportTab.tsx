@@ -113,7 +113,7 @@ export function ExportTab({ conversation, characters }: Props) {
               onChange={(e) => setIncludePi(e.target.checked)}
               className="rounded"
             />
-            <span className="text-sm">Pi Package (manifest.json + numbered MP3s)</span>
+            <span className="text-sm">Speaker Package (manifest.json + numbered MP3s)</span>
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -230,7 +230,7 @@ export function ExportTab({ conversation, characters }: Props) {
               <span>{formatDuration(result.totalDurationMs)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Pi package:</span>
+              <span className="text-muted-foreground">Speaker package:</span>
               <Badge variant={includePi ? 'secondary' : 'outline'}>
                 {includePi ? 'Included' : 'Skipped'}
               </Badge>
