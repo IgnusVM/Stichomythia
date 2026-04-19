@@ -103,8 +103,7 @@ export function buildNextSegmentDirection(
     suggestions.push('Let the conversation breathe — not every moment needs to be high-energy or meaningful. Sometimes people just chat about nothing for a bit.');
   }
 
-  const unusedSeeds = topicSeeds.filter(s => !coveredTopics.includes(s));
-  const seedsToUse = unusedSeeds.length > 0 ? unusedSeeds : topicSeeds;
+  const seedsToUse = topicSeeds.filter(s => !coveredTopics.includes(s));
 
   return {
     emotionalLandscape,

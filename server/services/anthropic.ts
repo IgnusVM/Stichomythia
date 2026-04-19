@@ -215,7 +215,7 @@ export async function generateSegment(options: GenerateSegmentOptions): Promise<
 
   const stream = client.messages.stream({
     model: options.model,
-    max_tokens: 8192,
+    max_tokens: 16384,
     system: [
       {
         type: 'text',

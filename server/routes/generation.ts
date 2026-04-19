@@ -635,7 +635,7 @@ generationRouter.post('/batch', async (req, res) => {
         custom_id: `seg-${segNum}-${uuid()}`,
         params: {
           model: conversation.settings.model,
-          max_tokens: 8192,
+          max_tokens: 16384,
           system: [{
             type: 'text' as const,
             text: systemPrompt,
