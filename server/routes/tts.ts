@@ -74,40 +74,55 @@ ttsRouter.get('/voices', async (_req, res) => {
     }> = [];
 
     const lines = stdout.split('\n');
-    let current: Record<string, string> = {};
+    const isTableFormat = lines[0]?.includes('Name') && lines[0]?.includes('Gender') && !lines[0]?.includes('Name:');
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('Name:')) {
-        if (current.Name) {
-          if (current.Name.startsWith('en-')) {
+    if (isTableFormat) {
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('Name') || trimmed.startsWith('---')) continue;
+        const parts = trimmed.split(/\s{2,}/);
+        const name = parts[0]?.trim();
+        if (!name || !name.startsWith('en-')) continue;
+        const gender = parts[1]?.trim() ?? '';
+        const friendlyName = name.split('-').pop()?.replace('Neural', '').replace('Multilingual', 'Multilingual ').trim() ?? name;
+        voices.push({
+          name,
+          gender,
+          locale: name.split('-').slice(0, 2).join('-'),
+          friendlyName,
+        });
+      }
+    } else {
+      let current: Record<string, string> = {};
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('Name:')) {
+          if (current.Name?.startsWith('en-')) {
             voices.push({
               name: current.Name,
               gender: current.Gender ?? '',
               locale: current.Locale ?? current.Name.split('-').slice(0, 2).join('-'),
-              friendlyName:
-                current.FriendlyName ?? current.Name.split('-').pop()?.replace('Neural', '') ?? '',
+              friendlyName: current.FriendlyName ?? current.Name.split('-').pop()?.replace('Neural', '') ?? '',
             });
           }
+          current = {};
+          current.Name = trimmed.replace('Name: ', '').trim();
+        } else if (trimmed.startsWith('Gender:')) {
+          current.Gender = trimmed.replace('Gender: ', '').trim();
+        } else if (trimmed.startsWith('Locale:')) {
+          current.Locale = trimmed.replace('Locale: ', '').trim();
+        } else if (trimmed.startsWith('FriendlyName:')) {
+          current.FriendlyName = trimmed.replace('FriendlyName: ', '').trim();
         }
-        current = {};
-        current.Name = trimmed.replace('Name: ', '').trim();
-      } else if (trimmed.startsWith('Gender:')) {
-        current.Gender = trimmed.replace('Gender: ', '').trim();
-      } else if (trimmed.startsWith('Locale:')) {
-        current.Locale = trimmed.replace('Locale: ', '').trim();
-      } else if (trimmed.startsWith('FriendlyName:')) {
-        current.FriendlyName = trimmed.replace('FriendlyName: ', '').trim();
       }
-    }
-
-    if (current.Name?.startsWith('en-')) {
-      voices.push({
-        name: current.Name,
-        gender: current.Gender ?? '',
-        locale: current.Locale ?? '',
-        friendlyName: current.FriendlyName ?? '',
-      });
+      if (current.Name?.startsWith('en-')) {
+        voices.push({
+          name: current.Name,
+          gender: current.Gender ?? '',
+          locale: current.Locale ?? '',
+          friendlyName: current.FriendlyName ?? '',
+        });
+      }
     }
 
     res.json(voices);
