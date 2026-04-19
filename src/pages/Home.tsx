@@ -77,7 +77,7 @@ export function Home() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="" className="h-32 w-auto mx-auto -mb-2" />
+          <img src="/logo.png" alt="" className="h-24 w-auto mx-auto mb-3" />
           <img src="/title.png" alt="Stichomythia" className="h-12 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Multi-speaker Bluetooth audio platform — AI conversations, stem playback, and system audio routing through your speaker array.
@@ -148,7 +148,7 @@ export function Home() {
         </div>
 
         <div className="text-center mt-10">
-          <p className="text-[10px] text-muted-foreground/50">Malevolent Gods Software</p>
+          <img src="/mgsoft.png" alt="Malevolent Gods Software" className="h-16 w-auto mx-auto opacity-60 hover:opacity-100 transition-opacity" />
         </div>
       </div>
     </div>
