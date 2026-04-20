@@ -364,8 +364,14 @@ export class NativeAudioPlayer {
     console.log('[native-audio] Capture stopped');
   }
 
+  private captureFeedCount = 0;
+
   feedCapture(left: Float32Array, right: Float32Array): void {
     if (!this.captureActive) return;
+    this.captureFeedCount++;
+    if (this.captureFeedCount % 100 === 1) {
+      console.log(`[native-audio] feedCapture #${this.captureFeedCount}: ${left.length} frames, writePos=${this.captureWritePos}, readPos=${this.captureReadPos}`);
+    }
     const len = left.length;
     for (let i = 0; i < len; i++) {
       const pos = this.captureWritePos % CAPTURE_RING_FRAMES;
@@ -399,15 +405,17 @@ export class NativeAudioPlayer {
     if (available < CHUNK_FRAMES) return;
 
     const chunksAvailable = Math.floor(available / CHUNK_FRAMES);
+    let minWritten = chunksAvailable;
 
     for (const [spId, sp] of this.speakers) {
       if (!this.captureSpeakers.has(spId)) continue;
 
       const readPos = Atomics.load(sp.controlView, 2);
       const buffered = sp.localWritePos - readPos;
-      if (buffered >= RING_CHUNKS - 1) continue;
+      const space = RING_CHUNKS - 1 - buffered;
+      if (space <= 0) { minWritten = 0; continue; }
 
-      const toWrite = Math.min(chunksAvailable, RING_CHUNKS - 1 - buffered);
+      const toWrite = Math.min(chunksAvailable, space);
 
       for (let c = 0; c < toWrite; c++) {
         const ringOffset = (sp.localWritePos % RING_CHUNKS) * CHUNK_FLOATS;
@@ -422,10 +430,13 @@ export class NativeAudioPlayer {
         sp.localWritePos++;
         Atomics.store(sp.controlView, 1, sp.localWritePos);
       }
+
+      if (toWrite < minWritten) minWritten = toWrite;
     }
 
-    const chunksConsumed = Math.min(chunksAvailable, RING_CHUNKS - 1);
-    this.captureReadPos += chunksConsumed * CHUNK_FRAMES;
+    if (minWritten > 0) {
+      this.captureReadPos += minWritten * CHUNK_FRAMES;
+    }
   }
 
   dispose(): void {

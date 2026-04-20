@@ -56,8 +56,11 @@ export function CaptureControls({ sourceId }: Props) {
       );
     };
 
+    const silencer = ctx.createGain();
+    silencer.gain.value = 0;
     source.connect(processor);
-    processor.connect(ctx.destination);
+    processor.connect(silencer);
+    silencer.connect(ctx.destination);
 
     streamRef.current = stream;
     processorRef.current = processor;
