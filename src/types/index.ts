@@ -159,6 +159,7 @@ export interface SpeakerConfig {
 export interface StemSlot {
   filePath: string;
   fileName: string;
+  label: string;
   speakerId: string | null;
   volume: number;
   muted: boolean;

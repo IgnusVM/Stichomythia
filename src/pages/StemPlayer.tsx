@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { v4 as uuid } from 'uuid';
-import { Music, Plus, Save, Trash2, FolderOpen, ChevronRight, ArrowUp } from 'lucide-react';
+import { Music, Plus, Save, Trash2, FolderOpen, ChevronRight, ArrowUp, ListMusic, X, GripVertical } from 'lucide-react';
 import { StemSlotRow } from '@/components/stems/StemSlotRow';
 import { StemTransport } from '@/components/stems/StemTransport';
 import { useAudioEngine } from '@/contexts/AudioEngineContext';
@@ -10,21 +10,47 @@ import { Input } from '@/components/ui/input';
 import type { StemTrackConfig, StemSlot } from '@/types';
 
 interface LoadedStem {
+  id: string;
   slot: StemSlot;
   rawBuffer: ArrayBuffer | null;
   duration: number;
 }
 
 function createEmptySlot(): StemSlot {
-  return { filePath: '', fileName: '', speakerId: null, volume: 1, muted: false, soloed: false };
+  return { filePath: '', fileName: '', label: '', speakerId: null, volume: 1, muted: false, soloed: false };
 }
 
 function createEmptyLoaded(): LoadedStem {
-  return { slot: createEmptySlot(), rawBuffer: null, duration: 0 };
+  return { id: uuid(), slot: createEmptySlot(), rawBuffer: null, duration: 0 };
+}
+
+function hasNativeAudio(): boolean {
+  return !!window.electronAPI?.nativeAudio;
+}
+
+function getNativeAudio(): NativeAudioAPI {
+  return window.electronAPI!.nativeAudio;
+}
+
+async function decodeDuration(buffer: ArrayBuffer): Promise<number> {
+  const offCtx = new OfflineAudioContext(2, 1, 44100);
+  const decoded = await offCtx.decodeAudioData(buffer.slice(0));
+  return decoded.duration;
+}
+
+async function extractPCM(buffer: ArrayBuffer): Promise<{ left: Float32Array; right: Float32Array }> {
+  const offCtx = new OfflineAudioContext(2, 44100 * 600, 44100);
+  const decoded = await offCtx.decodeAudioData(buffer.slice(0));
+  const left = decoded.getChannelData(0);
+  const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : left;
+  return {
+    left: new Float32Array(left),
+    right: new Float32Array(right),
+  };
 }
 
 export function StemPlayer() {
-  const { engine } = useAudioEngine();
+  const { engine, speakers } = useAudioEngine();
 
   const [tracks, setTracks] = useState<StemTrackConfig[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -35,104 +61,265 @@ export function StemPlayer() {
   const [playing, setPlaying] = useState(false);
   const [looping, setLooping] = useState(false);
   const [position, setPosition] = useState(0);
+  const [maxDuration, setMaxDuration] = useState(0);
+
+  const [queue, setQueue] = useState<string[]>([]);
 
   const [browseFolder, setBrowseFolder] = useState<string | null>(null);
   const [browseFiles, setBrowseFiles] = useState<{ name: string; path: string }[]>([]);
   const [browseSubdirs, setBrowseSubdirs] = useState<{ name: string; path: string }[]>([]);
   const [browseCurrent, setBrowseCurrent] = useState('');
+  const [nativeSpeakersReady, setNativeSpeakersReady] = useState(false);
 
-  const sourcesRef = useRef<(AudioBufferSourceNode | null)[]>([]);
-  const startTimeRef = useRef(0);
-  const offsetRef = useRef(0);
-  const rafRef = useRef(0);
   const playingRef = useRef(false);
+  const stemsRef = useRef(stems);
+  stemsRef.current = stems;
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
 
-  const maxDuration = Math.max(...stems.map(s => s.duration), 0);
   const hasAnyStem = stems.some(s => s.rawBuffer !== null);
+
+  // Recalculate max duration when stems change
+  useEffect(() => {
+    setMaxDuration(Math.max(...stems.map(s => s.duration), 0));
+  }, [stems]);
+
+  // Open native audio speakers on mount
+  useEffect(() => {
+    if (!hasNativeAudio() || speakers.length === 0) return;
+    const na = getNativeAudio();
+    Promise.all(
+      speakers.map(s => na.openSpeaker(s.id, s.deviceLabel))
+    ).then(() => {
+      setNativeSpeakersReady(true);
+      console.log('[stems] native audio speakers opened');
+    });
+  }, [speakers]);
+
+  // Listen for position updates and playback end from native audio
+  useEffect(() => {
+    if (!hasNativeAudio()) return;
+    const na = getNativeAudio();
+    const cleanupPos = na.onPosition((pos) => {
+      setPosition(pos);
+    });
+    const cleanupEnd = na.onEnded(() => {
+      playingRef.current = false;
+      setPlaying(false);
+      setPosition(0);
+      const q = queueRef.current;
+      if (q.length > 0) {
+        advanceQueueRef.current?.();
+      }
+    });
+    return () => { cleanupPos(); cleanupEnd(); };
+  }, []);
 
   useEffect(() => {
     api.tracks.list().then(setTracks).catch(() => {});
   }, []);
 
-  const loadTrack = useCallback(async (track: StemTrackConfig) => {
-    if (playingRef.current) stopPlayback();
-    setActiveTrackId(track.id);
-    setTrackName(track.name);
-    setDirty(false);
+  // Send stems to native audio when they change
+  const syncStemsToNative = useCallback(async (stemsToSync: LoadedStem[]) => {
+    if (!hasNativeAudio()) return;
+    const na = getNativeAudio();
 
+    for (const stem of stemsToSync) {
+      if (!stem.rawBuffer) continue;
+      const pcm = await extractPCM(stem.rawBuffer);
+      await na.loadStem(stem.id, pcm.left.buffer as ArrayBuffer, pcm.right.buffer as ArrayBuffer);
+      if (stem.slot.speakerId) {
+        await na.assignStem(stem.id, stem.slot.speakerId);
+      }
+      await na.setStemVolume(stem.id, stem.slot.volume);
+      await na.setStemMuted(stem.id, stem.slot.muted);
+      await na.setStemSoloed(stem.id, stem.slot.soloed);
+    }
+  }, []);
+
+  const loadTrackStems = useCallback(async (track: StemTrackConfig): Promise<LoadedStem[]> => {
     const loaded: LoadedStem[] = [];
     for (const stemSlot of track.stems) {
       if (stemSlot.filePath) {
         try {
           const resp = await fetch(api.tracks.fileUrl(stemSlot.filePath));
           const buf = await resp.arrayBuffer();
-          const offCtx = new OfflineAudioContext(2, 1, 44100);
-          const decoded = await offCtx.decodeAudioData(buf.slice(0));
-          loaded.push({ slot: stemSlot, rawBuffer: buf, duration: decoded.duration });
+          const duration = await decodeDuration(buf);
+          const slotWithLabel = { ...stemSlot, label: stemSlot.label || stemSlot.fileName.replace(/\.[^.]+$/, '') };
+          loaded.push({ id: uuid(), slot: slotWithLabel, rawBuffer: buf, duration });
         } catch {
-          loaded.push({ slot: { ...stemSlot, fileName: stemSlot.fileName + ' (missing)' }, rawBuffer: null, duration: 0 });
+          loaded.push({ id: uuid(), slot: { ...stemSlot, label: stemSlot.label || '', fileName: stemSlot.fileName + ' (missing)' }, rawBuffer: null, duration: 0 });
         }
-      } else {
-        loaded.push({ slot: stemSlot, rawBuffer: null, duration: 0 });
       }
     }
     if (loaded.length === 0) loaded.push(createEmptyLoaded());
-    setStems(loaded);
-    offsetRef.current = 0;
-    setPosition(0);
+    return loaded;
   }, []);
+
+  const stopPlayback = useCallback(async () => {
+    playingRef.current = false;
+    setPlaying(false);
+    if (hasNativeAudio()) {
+      await getNativeAudio().stop();
+    }
+    engine.resumeAll();
+  }, [engine]);
+
+  const startPlayback = useCallback(async (stemsToPlay: LoadedStem[], fromOffset: number) => {
+    if (!hasNativeAudio()) return;
+    engine.suspendAll();
+    const na = getNativeAudio();
+    await syncStemsToNative(stemsToPlay);
+    await na.setLooping(false);
+    await na.play(fromOffset);
+    playingRef.current = true;
+    setPlaying(true);
+  }, [engine, syncStemsToNative]);
+
+  const advanceQueueRef = useRef<(() => Promise<void>) | undefined>(undefined);
+
+  const advanceQueue = useCallback(async () => {
+    const q = queueRef.current;
+    if (q.length === 0) return;
+    const nextId = q[0];
+    setQueue(prev => prev.slice(1));
+    const track = tracksRef.current.find(t => t.id === nextId);
+    if (!track) return;
+    setActiveTrackId(track.id);
+    setTrackName(track.name);
+    setDirty(false);
+    const loaded = await loadTrackStems(track);
+    setStems(loaded);
+    setPosition(0);
+    await startPlayback(loaded, 0);
+  }, [loadTrackStems, startPlayback]);
+  advanceQueueRef.current = advanceQueue;
+
+  const loadTrack = useCallback(async (track: StemTrackConfig) => {
+    if (playingRef.current) await stopPlayback();
+    setActiveTrackId(track.id);
+    setTrackName(track.name);
+    setDirty(false);
+    const loaded = await loadTrackStems(track);
+    setStems(loaded);
+    setPosition(0);
+  }, [loadTrackStems, stopPlayback]);
 
   const addStem = useCallback(() => {
     setStems(prev => [...prev, createEmptyLoaded()]);
     setDirty(true);
   }, []);
 
-  const removeStem = useCallback((index: number) => {
-    if (playingRef.current) stopPlayback();
+  const removeStem = useCallback(async (index: number) => {
+    if (playingRef.current) await stopPlayback();
     setStems(prev => {
+      const removed = prev[index];
+      if (removed && hasNativeAudio()) {
+        getNativeAudio().unloadStem(removed.id);
+      }
       const next = prev.filter((_, i) => i !== index);
       return next.length === 0 ? [createEmptyLoaded()] : next;
     });
     setDirty(true);
-  }, []);
+  }, [stopPlayback]);
 
-  const updateStem = useCallback((index: number, update: Partial<LoadedStem>) => {
-    setStems(prev => prev.map((s, i) => i === index ? { ...s, ...update } : s));
-    setDirty(true);
-  }, []);
-
-  const updateSlot = useCallback((index: number, update: Partial<StemSlot>) => {
+  const updateSlot = useCallback(async (index: number, update: Partial<StemSlot>) => {
+    const stem = stemsRef.current[index];
     setStems(prev => prev.map((s, i) =>
       i === index ? { ...s, slot: { ...s.slot, ...update } } : s
     ));
     setDirty(true);
+
+    if (hasNativeAudio() && stem?.rawBuffer) {
+      const na = getNativeAudio();
+      if (update.speakerId !== undefined) {
+        if (update.speakerId) await na.assignStem(stem.id, update.speakerId);
+      }
+      if (update.volume !== undefined) await na.setStemVolume(stem.id, update.volume);
+      if (update.muted !== undefined) await na.setStemMuted(stem.id, update.muted);
+      if (update.soloed !== undefined) await na.setStemSoloed(stem.id, update.soloed);
+    }
   }, []);
 
-  const loadFileIntoSlot = useCallback(async (index: number, filePath: string, fileName: string) => {
+  const loadBufferIntoSlot = useCallback(async (index: number, buffer: ArrayBuffer, fileName: string, _filePath: string) => {
+    try {
+      const duration = await decodeDuration(buffer);
+      const uploaded = await api.tracks.upload(buffer, fileName);
+
+      setStems(prev => prev.map((s, i) => {
+        if (i !== index) return s;
+        const label = s.slot.label || fileName.replace(/\.[^.]+$/, '');
+        const speakerId = s.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
+        return {
+          ...s,
+          slot: { ...s.slot, filePath: uploaded.filePath, fileName, label, speakerId },
+          rawBuffer: buffer,
+          duration,
+        };
+      }));
+      setDirty(true);
+
+      if (hasNativeAudio()) {
+        const na = getNativeAudio();
+        const stemId = stemsRef.current[index]?.id;
+        if (stemId) {
+          const pcm = await extractPCM(buffer);
+          await na.loadStem(stemId, pcm.left.buffer as ArrayBuffer, pcm.right.buffer as ArrayBuffer);
+          const speakerId = stemsRef.current[index]?.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
+          if (speakerId) await na.assignStem(stemId, speakerId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load audio:', err);
+    }
+  }, [speakers]);
+
+  const loadFileFromServer = useCallback(async (index: number, filePath: string, fileName: string) => {
     try {
       const resp = await fetch(api.tracks.fileUrl(filePath));
       const buf = await resp.arrayBuffer();
-      const offCtx = new OfflineAudioContext(2, 1, 44100);
-      const decoded = await offCtx.decodeAudioData(buf.slice(0));
-      updateStem(index, {
-        slot: { ...stems[index].slot, filePath, fileName, speakerId: stems[index].slot.speakerId },
-        rawBuffer: buf,
-        duration: decoded.duration,
-      });
+      const duration = await decodeDuration(buf);
+      setStems(prev => prev.map((s, i) => {
+        if (i !== index) return s;
+        const label = s.slot.label || fileName.replace(/\.[^.]+$/, '');
+        const speakerId = s.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
+        return {
+          ...s,
+          slot: { ...s.slot, filePath, fileName, label, speakerId },
+          rawBuffer: buf,
+          duration,
+        };
+      }));
+      setDirty(true);
+
+      if (hasNativeAudio()) {
+        const na = getNativeAudio();
+        const stemId = stemsRef.current[index]?.id;
+        if (stemId) {
+          const pcm = await extractPCM(buf);
+          await na.loadStem(stemId, pcm.left.buffer as ArrayBuffer, pcm.right.buffer as ArrayBuffer);
+          const speakerId = stemsRef.current[index]?.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
+          if (speakerId) await na.assignStem(stemId, speakerId);
+        }
+      }
     } catch {
       console.error('Failed to load:', filePath);
     }
-  }, [stems, updateStem]);
+  }, [speakers]);
 
   const handleSave = useCallback(async () => {
-    const stemSlots = stems.filter(s => s.rawBuffer !== null).map(s => s.slot);
+    const current = stemsRef.current;
+    const stemSlots = current.filter(s => s.rawBuffer !== null).map(s => s.slot);
+    const name = trackName || 'Untitled Track';
     if (activeTrackId) {
-      const updated = await api.tracks.update(activeTrackId, { name: trackName, stems: stemSlots });
+      const updated = await api.tracks.update(activeTrackId, { name, stems: stemSlots });
       setTracks(prev => prev.map(t => t.id === activeTrackId ? updated : t));
     } else {
       const track: StemTrackConfig = {
         id: uuid(),
-        name: trackName || 'Untitled Track',
+        name,
         stems: stemSlots,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -142,23 +329,42 @@ export function StemPlayer() {
       setActiveTrackId(created.id);
     }
     setDirty(false);
-  }, [activeTrackId, trackName, stems]);
+  }, [activeTrackId, trackName]);
 
-  const handleNew = useCallback(() => {
-    if (playingRef.current) stopPlayback();
+  const handleNew = useCallback(async () => {
+    if (playingRef.current) await stopPlayback();
     setActiveTrackId(null);
     setTrackName('');
     setStems([createEmptyLoaded()]);
     setDirty(false);
-    offsetRef.current = 0;
     setPosition(0);
-  }, []);
+  }, [stopPlayback]);
 
   const handleDelete = useCallback(async (id: string) => {
     await api.tracks.delete(id);
     setTracks(prev => prev.filter(t => t.id !== id));
+    setQueue(prev => prev.filter(qid => qid !== id));
     if (activeTrackId === id) handleNew();
   }, [activeTrackId, handleNew]);
+
+  const addToQueue = useCallback((trackId: string) => {
+    setQueue(prev => [...prev, trackId]);
+  }, []);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const playTrack = useCallback(async (track: StemTrackConfig) => {
+    if (playingRef.current) await stopPlayback();
+    setActiveTrackId(track.id);
+    setTrackName(track.name);
+    setDirty(false);
+    const loaded = await loadTrackStems(track);
+    setStems(loaded);
+    setPosition(0);
+    await startPlayback(loaded, 0);
+  }, [loadTrackStems, stopPlayback, startPlayback]);
 
   const openFolder = useCallback(async (folderPath: string) => {
     try {
@@ -173,6 +379,12 @@ export function StemPlayer() {
   }, []);
 
   const promptFolder = useCallback(() => {
+    if (window.electronAPI?.selectFolder) {
+      window.electronAPI.selectFolder().then((folder: string | null) => {
+        if (folder) openFolder(folder);
+      });
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.setAttribute('webkitdirectory', '');
@@ -181,80 +393,53 @@ export function StemPlayer() {
       if (file) {
         const folderPath = (file as unknown as { path: string }).path;
         const dir = folderPath.substring(0, folderPath.lastIndexOf('\\')) || folderPath.substring(0, folderPath.lastIndexOf('/'));
-        openFolder(dir);
+        if (dir) openFolder(dir);
       }
     };
     input.click();
   }, [openFolder]);
 
-  const stopAllSources = useCallback(() => {
-    for (let i = 0; i < sourcesRef.current.length; i++) {
-      try { sourcesRef.current[i]?.stop(); } catch {}
-      sourcesRef.current[i] = null;
-    }
-    cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  const tickPosition = useCallback(() => {
-    if (!playingRef.current) return;
-    const elapsed = offsetRef.current + (performance.now() - startTimeRef.current) / 1000;
-    setPosition(elapsed);
-    if (elapsed >= maxDuration) {
-      if (looping) {
-        offsetRef.current = 0;
-        startPlayback(0);
-      } else {
-        stopPlayback();
-      }
-      return;
-    }
-    rafRef.current = requestAnimationFrame(tickPosition);
-  }, [maxDuration, looping]);
-
-  const startPlayback = useCallback(async (fromOffset: number) => {
-    stopAllSources();
-    sourcesRef.current = new Array(stems.length).fill(null);
-    const anySoloed = stems.some(s => s.slot.soloed);
-    for (let i = 0; i < stems.length; i++) {
-      const { slot, rawBuffer } = stems[i];
-      if (!rawBuffer || !slot.speakerId) continue;
-      if (slot.muted || (anySoloed && !slot.soloed)) continue;
-      const ch = engine.channels.get(slot.speakerId);
-      if (!ch) continue;
-      const decoded = await ch.audioContext.decodeAudioData(rawBuffer.slice(0));
-      const source = ch.audioContext.createBufferSource();
-      source.buffer = decoded;
-      source.connect(ch.inputNode);
-      if (decoded.duration - fromOffset <= 0) continue;
-      source.start(0, fromOffset);
-      sourcesRef.current[i] = source;
-    }
-    startTimeRef.current = performance.now();
-    offsetRef.current = fromOffset;
+  const handlePlay = useCallback(async () => {
+    if (!hasNativeAudio()) return;
+    engine.suspendAll();
+    await syncStemsToNative(stemsRef.current);
+    await getNativeAudio().play(position);
     playingRef.current = true;
     setPlaying(true);
-    rafRef.current = requestAnimationFrame(tickPosition);
-  }, [stems, engine, stopAllSources, tickPosition]);
+  }, [engine, position, syncStemsToNative]);
 
-  const stopPlayback = useCallback(() => {
+  const handlePause = useCallback(async () => {
     playingRef.current = false;
     setPlaying(false);
-    stopAllSources();
-  }, [stopAllSources]);
+    if (hasNativeAudio()) {
+      const state = await getNativeAudio().getState();
+      setPosition(state.position);
+      await getNativeAudio().pause();
+    }
+    engine.resumeAll();
+  }, [engine]);
 
-  const handlePlay = useCallback(() => startPlayback(offsetRef.current), [startPlayback]);
-  const handlePause = useCallback(() => {
-    offsetRef.current += (performance.now() - startTimeRef.current) / 1000;
-    playingRef.current = false;
-    setPlaying(false);
-    stopAllSources();
-  }, [stopAllSources]);
-  const handleStop = useCallback(() => { stopPlayback(); offsetRef.current = 0; setPosition(0); }, [stopPlayback]);
-  const handleSeek = useCallback((pos: number) => {
-    offsetRef.current = pos;
+  const handleStop = useCallback(async () => {
+    await stopPlayback();
+    setPosition(0);
+  }, [stopPlayback]);
+
+  const handleSeek = useCallback(async (pos: number) => {
     setPosition(pos);
-    if (playingRef.current) startPlayback(pos);
-  }, [startPlayback]);
+    if (hasNativeAudio()) {
+      await getNativeAudio().seek(pos);
+      if (playingRef.current) {
+        await getNativeAudio().play(pos);
+      }
+    }
+  }, []);
+
+  const handleNext = useCallback(async () => {
+    if (queueRef.current.length > 0) {
+      await stopPlayback();
+      advanceQueueRef.current?.();
+    }
+  }, [stopPlayback]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -269,7 +454,11 @@ export function StemPlayer() {
     return () => window.removeEventListener('keydown', onKey);
   }, [handlePlay, handlePause, hasAnyStem]);
 
-  useEffect(() => () => stopAllSources(), [stopAllSources]);
+  useEffect(() => {
+    return () => {
+      if (hasNativeAudio()) getNativeAudio().stop();
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -277,11 +466,16 @@ export function StemPlayer() {
         <div className="flex items-center gap-3">
           <Music className="w-5 h-5 text-gold" />
           <h1 className="text-base font-heading tracking-wider">Stem Workstation</h1>
+          {hasNativeAudio() && (
+            <span className={`text-[9px] px-1.5 py-0.5 rounded ${nativeSpeakersReady ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+              {nativeSpeakersReady ? 'Native Audio' : 'Initializing...'}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Track Library */}
+        {/* Track Library & Queue */}
         <div className="w-56 border-r border-gold/10 flex flex-col shrink-0">
           <div className="flex items-center justify-between px-3 py-2 border-b border-gold/10">
             <span className="text-xs font-heading text-gold-light tracking-wider">Tracks</span>
@@ -293,14 +487,22 @@ export function StemPlayer() {
             {tracks.map(t => (
               <div
                 key={t.id}
-                className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors group ${
+                className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer transition-colors group ${
                   t.id === activeTrackId ? 'bg-gold-muted text-gold' : 'text-muted-foreground hover:bg-card/80 hover:text-foreground'
                 }`}
                 onClick={() => loadTrack(t)}
+                onDoubleClick={() => playTrack(t)}
               >
                 <Music className="w-3 h-3 shrink-0" />
                 <span className="text-xs truncate flex-1">{t.name}</span>
                 <span className="text-[10px] text-muted-foreground">{t.stems.filter(s => s.filePath).length}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); addToQueue(t.id); }}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-gold transition-all"
+                  title="Add to queue"
+                >
+                  <ListMusic className="w-3 h-3" />
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}
                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
@@ -313,6 +515,38 @@ export function StemPlayer() {
               <p className="text-[10px] text-muted-foreground px-3 py-4 text-center">No saved tracks</p>
             )}
           </div>
+
+          {/* Queue */}
+          {queue.length > 0 && (
+            <div className="border-t border-gold/10">
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-xs font-heading text-gold-light tracking-wider">
+                  Queue ({queue.length})
+                </span>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setQueue([])}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+              <div className="overflow-y-auto max-h-36">
+                {queue.map((trackId, i) => {
+                  const track = tracks.find(t => t.id === trackId);
+                  return (
+                    <div key={`${trackId}-${i}`} className="flex items-center gap-1.5 px-3 py-1 text-muted-foreground group">
+                      <GripVertical className="w-3 h-3 shrink-0 text-gold/30" />
+                      <span className="text-[10px] text-gold/50 w-3 shrink-0">{i + 1}</span>
+                      <span className="text-[10px] truncate flex-1">{track?.name ?? 'Unknown'}</span>
+                      <button
+                        onClick={() => removeFromQueue(i)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Folder browser */}
           <div className="border-t border-gold/10">
@@ -346,27 +580,27 @@ export function StemPlayer() {
                     {d.name}
                   </button>
                 ))}
-                {browseFiles.map(f => {
-                  const emptySlotIdx = stems.findIndex(s => !s.rawBuffer);
-                  return (
-                    <button
-                      key={f.path}
-                      onClick={() => {
-                        if (emptySlotIdx >= 0) {
-                          loadFileIntoSlot(emptySlotIdx, f.path, f.name);
-                        } else {
-                          const newIdx = stems.length;
-                          setStems(prev => [...prev, createEmptyLoaded()]);
-                          setTimeout(() => loadFileIntoSlot(newIdx, f.path, f.name), 0);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1 w-full text-left text-[10px] hover:bg-gold-muted/50 hover:text-gold truncate"
-                    >
-                      <Music className="w-3 h-3 shrink-0 text-gold/50" />
-                      {f.name}
-                    </button>
-                  );
-                })}
+                {browseFiles.map(f => (
+                  <button
+                    key={f.path}
+                    onClick={() => {
+                      const emptyIdx = stemsRef.current.findIndex(s => !s.rawBuffer);
+                      if (emptyIdx >= 0) {
+                        loadFileFromServer(emptyIdx, f.path, f.name);
+                      } else {
+                        setStems(prev => {
+                          const newStem = createEmptyLoaded();
+                          loadFileFromServer(prev.length, f.path, f.name);
+                          return [...prev, newStem];
+                        });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1 w-full text-left text-[10px] hover:bg-gold-muted/50 hover:text-gold truncate"
+                  >
+                    <Music className="w-3 h-3 shrink-0 text-gold/50" />
+                    {f.name}
+                  </button>
+                ))}
                 {browseFiles.length === 0 && browseSubdirs.length === 0 && (
                   <p className="text-[10px] text-muted-foreground px-3 py-2 text-center">Empty folder</p>
                 )}
@@ -402,14 +636,14 @@ export function StemPlayer() {
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
             {stems.map((stem, i) => (
               <StemSlotRow
-                key={i}
+                key={stem.id}
                 index={i}
                 slot={stem.slot}
                 hasBuffer={stem.rawBuffer !== null}
                 duration={stem.duration}
                 position={position}
                 onUpdateSlot={(update) => updateSlot(i, update)}
-                onLoadFile={(path, name) => loadFileIntoSlot(i, path, name)}
+                onLoadBuffer={(buf, name, path) => loadBufferIntoSlot(i, buf, name, path)}
                 onRemove={() => removeStem(i)}
               />
             ))}
@@ -428,11 +662,17 @@ export function StemPlayer() {
             looping={looping}
             position={position}
             duration={maxDuration}
+            hasQueue={queue.length > 0}
             onPlay={handlePlay}
             onPause={handlePause}
             onStop={handleStop}
             onSeek={handleSeek}
-            onToggleLoop={() => setLooping(!looping)}
+            onToggleLoop={() => {
+              const newLooping = !looping;
+              setLooping(newLooping);
+              if (hasNativeAudio()) getNativeAudio().setLooping(newLooping);
+            }}
+            onNext={handleNext}
             disabled={!hasAnyStem}
           />
         </div>

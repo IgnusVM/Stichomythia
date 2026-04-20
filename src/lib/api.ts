@@ -285,6 +285,15 @@ export const api = {
     update: (id: string, data: Partial<StemTrackConfig>) =>
       request<StemTrackConfig>(`/tracks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<{ ok: boolean }>(`/tracks/${id}`, { method: 'DELETE' }),
+    upload: async (buffer: ArrayBuffer, fileName: string): Promise<{ filePath: string; fileName: string }> => {
+      const res = await fetch(`${BASE}/tracks/upload?name=${encodeURIComponent(fileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buffer,
+      });
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      return res.json();
+    },
     browse: (folderPath: string) =>
       request<{ files: { name: string; path: string }[]; subdirs: { name: string; path: string }[]; current: string }>(
         '/tracks/browse', { method: 'POST', body: JSON.stringify({ path: folderPath }) }

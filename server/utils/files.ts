@@ -57,6 +57,7 @@ export async function ensureDataDirs(): Promise<void> {
     ensureDir(path.join(DATA_DIR, 'characters')),
     ensureDir(path.join(DATA_DIR, 'conversations')),
     ensureDir(path.join(DATA_DIR, 'audio')),
+    ensureDir(path.join(DATA_DIR, 'stems')),
     ensureDir(EXPORTS_DIR),
   ]);
   console.log(`[server] Data directory: ${DATA_DIR}`);
@@ -124,4 +125,8 @@ export function getMixerPath(): string {
 
 export function getTracksPath(): string {
   return path.join(DATA_DIR, 'tracks.json');
+}
+
+export function getStemsDir(): string {
+  return path.join(DATA_DIR, 'stems');
 }

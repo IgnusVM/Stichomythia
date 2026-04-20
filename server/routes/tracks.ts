@@ -1,13 +1,15 @@
-import { Router } from 'express';
+import { Router, raw } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { readJson, writeJson, getTracksPath } from '../utils/files.js';
+import crypto from 'crypto';
+import { readJson, writeJson, getTracksPath, getStemsDir } from '../utils/files.js';
 
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff']);
 
 interface StemSlot {
   filePath: string;
   fileName: string;
+  label: string;
   speakerId: string | null;
   volume: number;
   muted: boolean;
@@ -66,6 +68,19 @@ tracksRouter.delete('/:id', async (req, res) => {
   store.tracks = store.tracks.filter(t => t.id !== req.params.id);
   await writeJson(getTracksPath(), store);
   res.json({ ok: true });
+});
+
+tracksRouter.post('/upload', raw({ type: 'application/octet-stream', limit: '100mb' }), async (req, res) => {
+  const fileName = req.query.name as string;
+  if (!fileName) { res.status(400).json({ error: 'name query param required' }); return; }
+  const ext = path.extname(fileName).toLowerCase() || '.wav';
+  if (!AUDIO_EXTENSIONS.has(ext)) { res.status(400).json({ error: 'Not an audio file' }); return; }
+  const data = req.body as Buffer;
+  if (!data || data.length === 0) { res.status(400).json({ error: 'Empty body' }); return; }
+  const id = crypto.randomUUID();
+  const destPath = path.join(getStemsDir(), `${id}${ext}`);
+  await fs.writeFile(destPath, data);
+  res.json({ filePath: destPath, fileName });
 });
 
 tracksRouter.post('/browse', async (req, res) => {

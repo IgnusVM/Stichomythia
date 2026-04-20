@@ -1,7 +1,7 @@
 {
   "name": "stichomythia",
   "private": true,
-  "version": "2.8.0",
+  "version": "3.0.3",
   "description": "Multi-speaker Bluetooth audio platform with AI conversations, stem player, and system audio routing",
   "author": "Malevolent Gods Software",
   "type": "module",
@@ -22,6 +22,7 @@
     "@anthropic-ai/sdk": "^0.90.0",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/cinzel": "^5.2.8",
+    "audify": "^1.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -65,7 +66,7 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "forceCodeSigning": false
     },
     "nsis": {

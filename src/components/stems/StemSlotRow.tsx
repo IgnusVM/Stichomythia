@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload, Trash2 } from 'lucide-react';
 import { useAudioEngine } from '@/contexts/AudioEngineContext';
 import type { StemSlot } from '@/types';
 
@@ -10,7 +10,7 @@ interface Props {
   duration: number;
   position: number;
   onUpdateSlot: (update: Partial<StemSlot>) => void;
-  onLoadFile: (path: string, name: string) => void;
+  onLoadBuffer: (buffer: ArrayBuffer, fileName: string, filePath: string) => void;
   onRemove: () => void;
 }
 
@@ -23,8 +23,10 @@ function drawWaveform(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const { width, height } = canvas;
   const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
   canvas.width = width * dpr;
   canvas.height = height * dpr;
   ctx.scale(dpr, dpr);
@@ -71,7 +73,7 @@ export function StemSlotRow({
   duration,
   position,
   onUpdateSlot,
-  onLoadFile,
+  onLoadBuffer,
   onRemove,
 }: Props) {
   const { speakers } = useAudioEngine();
@@ -81,16 +83,10 @@ export function StemSlotRow({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
-    const filePath = (file as unknown as { path?: string }).path;
-    if (filePath) {
-      onLoadFile(filePath, file.name);
-    } else {
-      const arrayBuffer = await file.arrayBuffer();
-      const offlineCtx = new OfflineAudioContext(2, 1, 44100);
-      const decoded = await offlineCtx.decodeAudioData(arrayBuffer.slice(0));
-      setAudioBuffer(decoded);
-    }
-  }, [onLoadFile]);
+    const filePath = (file as unknown as { path?: string }).path || '';
+    const arrayBuffer = await file.arrayBuffer();
+    onLoadBuffer(arrayBuffer, file.name, filePath);
+  }, [onLoadBuffer]);
 
   useEffect(() => {
     if (!hasBuffer || !slot.filePath) { setAudioBuffer(null); return; }
@@ -113,15 +109,22 @@ export function StemSlotRow({
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('audio/')) handleFile(file);
+    if (file && (file.type.startsWith('audio/') || file.name.match(/\.(wav|mp3|flac|ogg|aac|m4a|wma)$/i))) {
+      handleFile(file);
+    }
   }, [handleFile]);
 
   return (
-    <div className={`border rounded-lg transition-colors flex-1 min-h-0 flex flex-col ${
-      dragging ? 'border-gold bg-gold-muted/30' : 'border-gold/10 bg-card/50'
-    }`}>
+    <div
+      className={`border rounded-lg transition-colors flex flex-col ${
+        dragging ? 'border-gold bg-gold-muted/30' : 'border-gold/10 bg-card/50'
+      }`}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+    >
       <div className="flex items-center gap-3 px-3 py-2 shrink-0">
-        <span className="text-xs font-heading text-gold-light w-10 shrink-0">
+        <span className="text-xs font-heading text-gold-light w-6 shrink-0">
           {index + 1}
         </span>
 
@@ -155,49 +158,47 @@ export function StemSlotRow({
           ))}
         </select>
 
+        <input
+          value={slot.label}
+          onChange={(e) => onUpdateSlot({ label: e.target.value })}
+          placeholder={hasBuffer ? slot.fileName : `Stem ${index + 1}`}
+          className="text-xs bg-transparent border-b border-transparent hover:border-gold/20 focus:border-gold/40 focus:outline-none px-1 py-0.5 text-foreground w-36 shrink-0 truncate placeholder:text-muted-foreground"
+        />
+
         {hasBuffer ? (
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground truncate">{slot.fileName}</span>
-            <button
-              onClick={onRemove}
-              className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <span className="text-[10px] text-muted-foreground truncate flex-1 min-w-0">{slot.fileName}</span>
         ) : (
-          <div
-            className="flex-1 min-w-0"
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 min-w-0 flex items-center justify-center gap-2 py-1.5 rounded border border-dashed border-gold/20 text-xs text-muted-foreground hover:text-gold-light hover:border-gold/40 transition-colors"
           >
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 py-1.5 rounded border border-dashed border-gold/20 text-xs text-muted-foreground hover:text-gold-light hover:border-gold/40 transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Drop audio or click to browse
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-              className="hidden"
-            />
-          </div>
+            <Upload className="w-3.5 h-3.5" />
+            Drop audio or click to browse
+          </button>
         )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+          className="hidden"
+        />
+
+        <button
+          onClick={onRemove}
+          className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors ml-1"
+          title="Delete stem"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {audioBuffer && (
-        <div className="px-3 pb-1.5 flex-1 min-h-0">
+        <div className="px-3 pb-1.5 h-12 shrink-0">
           <canvas
             ref={canvasRef}
-            width={600}
-            height={40}
             className="w-full h-full rounded"
-            style={{ imageRendering: 'pixelated' }}
           />
         </div>
       )}

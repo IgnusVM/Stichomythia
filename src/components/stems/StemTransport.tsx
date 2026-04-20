@@ -1,17 +1,19 @@
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Play, Pause, Square, Repeat } from 'lucide-react';
+import { Play, Pause, Square, Repeat, SkipForward } from 'lucide-react';
 
 interface Props {
   playing: boolean;
   looping: boolean;
   position: number;
   duration: number;
+  hasQueue: boolean;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
   onSeek: (position: number) => void;
   onToggleLoop: () => void;
+  onNext: () => void;
   disabled: boolean;
 }
 
@@ -26,11 +28,13 @@ export function StemTransport({
   looping,
   position,
   duration,
+  hasQueue,
   onPlay,
   onPause,
   onStop,
   onSeek,
   onToggleLoop,
+  onNext,
   disabled,
 }: Props) {
   return (
@@ -47,6 +51,16 @@ export function StemTransport({
         )}
         <Button size="sm" variant="outline" onClick={onStop} disabled={disabled} className="border-gold/20 hover:bg-gold-muted">
           <Square className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onNext}
+          disabled={!hasQueue}
+          className="border-gold/20 hover:bg-gold-muted"
+          title="Next in queue"
+        >
+          <SkipForward className="w-4 h-4" />
         </Button>
         <Button
           size="sm"

@@ -4,13 +4,13 @@ import type { EQBandSettings } from '@/types';
 export interface ChannelState {
   speakerId: string;
   deviceId: string;
-  audioContext: AudioContext;
   inputNode: GainNode;
   gainNode: GainNode;
   eqNodes: BiquadFilterNode[];
   compressorNode: DynamicsCompressorNode;
   analyserNode: AnalyserNode;
-  keepAliveOscillator: OscillatorNode;
+  mediaStreamDest: MediaStreamAudioDestinationNode;
+  audioElement: HTMLAudioElement;
   keepAliveGain: GainNode;
   volume: number;
   muted: boolean;
@@ -20,16 +20,25 @@ export interface ChannelState {
 }
 
 export class AudioEngine {
+  audioContext: AudioContext;
   channels = new Map<string, ChannelState>();
   masterVolume = 1;
   private keepAliveActive = false;
+  private keepAliveOscillator: OscillatorNode;
+
+  constructor() {
+    this.audioContext = new AudioContext({ latencyHint: 'playback' });
+    this.keepAliveOscillator = this.audioContext.createOscillator();
+    this.keepAliveOscillator.frequency.value = 1;
+    this.keepAliveOscillator.start();
+  }
 
   createChannel(speakerId: string, deviceId: string): ChannelState {
     if (this.channels.has(speakerId)) {
       this.removeChannel(speakerId);
     }
 
-    const ctx = new AudioContext({ sinkId: deviceId } as AudioContextOptions);
+    const ctx = this.audioContext;
 
     const inputNode = ctx.createGain();
     inputNode.gain.value = 1;
@@ -58,37 +67,41 @@ export class AudioEngine {
     analyserNode.fftSize = 256;
     analyserNode.smoothingTimeConstant = 0.8;
 
-    // Wire: input → gain → EQ chain → compressor → analyser → destination
+    const mediaStreamDest = ctx.createMediaStreamDestination();
+
     inputNode.connect(gainNode);
     let prev: AudioNode = gainNode;
     for (const eq of eqNodes) {
       prev.connect(eq);
       prev = eq;
     }
-    // Compressor in chain but bypassed by default (connect through it)
     prev.connect(compressorNode);
     compressorNode.connect(analyserNode);
-    analyserNode.connect(ctx.destination);
+    analyserNode.connect(mediaStreamDest);
 
-    // Keep-alive oscillator
+    const audioElement = new Audio();
+    audioElement.srcObject = mediaStreamDest.stream;
+    if ('setSinkId' in audioElement) {
+      (audioElement as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+        .setSinkId(deviceId).catch(() => {});
+    }
+    audioElement.play().catch(() => {});
+
     const keepAliveGain = ctx.createGain();
-    keepAliveGain.gain.value = 0;
-    const keepAliveOscillator = ctx.createOscillator();
-    keepAliveOscillator.frequency.value = 1;
-    keepAliveOscillator.connect(keepAliveGain);
-    keepAliveGain.connect(ctx.destination);
-    keepAliveOscillator.start();
+    keepAliveGain.gain.value = this.keepAliveActive ? 0.001 : 0;
+    this.keepAliveOscillator.connect(keepAliveGain);
+    keepAliveGain.connect(inputNode);
 
     const channel: ChannelState = {
       speakerId,
       deviceId,
-      audioContext: ctx,
       inputNode,
       gainNode,
       eqNodes,
       compressorNode,
       analyserNode,
-      keepAliveOscillator,
+      mediaStreamDest,
+      audioElement,
       keepAliveGain,
       volume: 1,
       muted: false,
@@ -98,21 +111,16 @@ export class AudioEngine {
     };
 
     this.channels.set(speakerId, channel);
-
-    if (this.keepAliveActive) {
-      keepAliveGain.gain.value = 0.001;
-    }
-
     return channel;
   }
 
   removeChannel(speakerId: string): void {
     const ch = this.channels.get(speakerId);
     if (!ch) return;
-    try {
-      ch.keepAliveOscillator.stop();
-    } catch {}
-    ch.audioContext.close().catch(() => {});
+    ch.audioElement.pause();
+    ch.audioElement.srcObject = null;
+    ch.keepAliveGain.disconnect();
+    ch.inputNode.disconnect();
     this.channels.delete(speakerId);
   }
 
@@ -214,7 +222,7 @@ export class AudioEngine {
   createSourceFromElement(speakerId: string, element: HTMLMediaElement): MediaElementAudioSourceNode | null {
     const ch = this.channels.get(speakerId);
     if (!ch) return null;
-    const source = ch.audioContext.createMediaElementSource(element);
+    const source = this.audioContext.createMediaElementSource(element);
     source.connect(ch.inputNode);
     return source;
   }
@@ -222,7 +230,7 @@ export class AudioEngine {
   createSourceFromStream(speakerId: string, stream: MediaStream): MediaStreamAudioSourceNode | null {
     const ch = this.channels.get(speakerId);
     if (!ch) return null;
-    const source = ch.audioContext.createMediaStreamSource(stream);
+    const source = this.audioContext.createMediaStreamSource(stream);
     source.connect(ch.inputNode);
     return source;
   }
@@ -230,16 +238,14 @@ export class AudioEngine {
   createSourceFromBuffer(speakerId: string, buffer: AudioBuffer): AudioBufferSourceNode | null {
     const ch = this.channels.get(speakerId);
     if (!ch) return null;
-    const source = ch.audioContext.createBufferSource();
+    const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(ch.inputNode);
     return source;
   }
 
-  async decodeAudio(speakerId: string, arrayBuffer: ArrayBuffer): Promise<AudioBuffer | null> {
-    const ch = this.channels.get(speakerId);
-    if (!ch) return null;
-    return ch.audioContext.decodeAudioData(arrayBuffer);
+  async decodeAudio(_speakerId: string, arrayBuffer: ArrayBuffer): Promise<AudioBuffer | null> {
+    return this.audioContext.decodeAudioData(arrayBuffer);
   }
 
   startKeepAlive(): void {
@@ -263,7 +269,7 @@ export class AudioEngine {
     const frequencies = [440, 554, 659, 880];
     const freq = frequencies[frequencyIndex % frequencies.length];
     const duration = 1;
-    const ctx = ch.audioContext;
+    const ctx = this.audioContext;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -290,15 +296,32 @@ export class AudioEngine {
     });
   }
 
-  getChannelCurrentTime(speakerId: string): number {
-    const ch = this.channels.get(speakerId);
-    return ch ? ch.audioContext.currentTime : 0;
+  getChannelCurrentTime(_speakerId: string): number {
+    return this.audioContext.currentTime;
+  }
+
+  suspendAll(): void {
+    this.stopKeepAlive();
+    for (const ch of this.channels.values()) {
+      ch.audioElement.pause();
+    }
+    this.audioContext.suspend().catch(() => {});
+  }
+
+  resumeAll(): void {
+    this.audioContext.resume().catch(() => {});
+    for (const ch of this.channels.values()) {
+      ch.audioElement.play().catch(() => {});
+    }
+    this.startKeepAlive();
   }
 
   dispose(): void {
     this.stopKeepAlive();
+    try { this.keepAliveOscillator.stop(); } catch {}
     for (const [id] of this.channels) {
       this.removeChannel(id);
     }
+    this.audioContext.close().catch(() => {});
   }
 }

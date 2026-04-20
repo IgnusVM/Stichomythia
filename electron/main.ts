@@ -1,12 +1,14 @@
-import { app, BrowserWindow, shell, ipcMain, desktopCapturer } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, desktopCapturer, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { fork, execFile } from 'child_process';
+import { NativeAudioPlayer } from './native-audio.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isDev = !app.isPackaged;
+const nativeAudio = new NativeAudioPlayer();
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ReturnType<typeof fork> | null = null;
@@ -175,9 +177,93 @@ $results | ConvertTo-Json -Compress
   });
 });
 
+ipcMain.handle('select-folder', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Audio Folder',
+  });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
+
+// Native audio IPC
+ipcMain.handle('native-audio:get-devices', () => {
+  return nativeAudio.getDevices();
+});
+
+ipcMain.handle('native-audio:open-speaker', (_e, speakerId: string, deviceName: string) => {
+  return nativeAudio.openSpeaker(speakerId, deviceName);
+});
+
+ipcMain.handle('native-audio:close-speaker', (_e, speakerId: string) => {
+  nativeAudio.closeSpeaker(speakerId);
+});
+
+ipcMain.handle('native-audio:load-stem', (_e, stemId: string, leftBuf: ArrayBuffer, rightBuf: ArrayBuffer) => {
+  nativeAudio.loadStem(stemId, new Float32Array(leftBuf), new Float32Array(rightBuf));
+});
+
+ipcMain.handle('native-audio:unload-stem', (_e, stemId: string) => {
+  nativeAudio.unloadStem(stemId);
+});
+
+ipcMain.handle('native-audio:assign-stem', (_e, stemId: string, speakerId: string) => {
+  nativeAudio.assignStem(stemId, speakerId);
+});
+
+ipcMain.handle('native-audio:set-stem-volume', (_e, stemId: string, volume: number) => {
+  nativeAudio.setStemVolume(stemId, volume);
+});
+
+ipcMain.handle('native-audio:set-stem-muted', (_e, stemId: string, muted: boolean) => {
+  nativeAudio.setStemMuted(stemId, muted);
+});
+
+ipcMain.handle('native-audio:set-stem-soloed', (_e, stemId: string, soloed: boolean) => {
+  nativeAudio.setStemSoloed(stemId, soloed);
+});
+
+ipcMain.handle('native-audio:play', (_e, fromPosition?: number) => {
+  nativeAudio.play(fromPosition);
+});
+
+ipcMain.handle('native-audio:pause', () => {
+  nativeAudio.pause();
+});
+
+ipcMain.handle('native-audio:stop', () => {
+  nativeAudio.stop();
+});
+
+ipcMain.handle('native-audio:seek', (_e, position: number) => {
+  nativeAudio.seek(position);
+});
+
+ipcMain.handle('native-audio:set-looping', (_e, looping: boolean) => {
+  nativeAudio.setLooping(looping);
+});
+
+ipcMain.handle('native-audio:get-state', () => {
+  return {
+    playing: nativeAudio.isPlaying(),
+    position: nativeAudio.getPosition(),
+    duration: nativeAudio.getDuration(),
+  };
+});
+
+function setupNativeAudioCallbacks() {
+  nativeAudio.setOnPositionUpdate((pos, dur) => {
+    mainWindow?.webContents.send('native-audio:position', pos, dur);
+  });
+  nativeAudio.setOnPlaybackEnd(() => {
+    mainWindow?.webContents.send('native-audio:ended');
+  });
+}
+
 app.on('ready', async () => {
   await startServer();
   createWindow();
+  setupNativeAudioCallbacks();
 });
 
 app.on('window-all-closed', () => {
@@ -189,6 +275,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  nativeAudio.dispose();
   if (serverProcess) {
     serverProcess.kill();
     serverProcess = null;
