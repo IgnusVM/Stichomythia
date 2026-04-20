@@ -156,6 +156,23 @@ export interface SpeakerConfig {
   updatedAt: string;
 }
 
+export interface StemSlot {
+  filePath: string;
+  fileName: string;
+  speakerId: string | null;
+  volume: number;
+  muted: boolean;
+  soloed: boolean;
+}
+
+export interface StemTrackConfig {
+  id: string;
+  name: string;
+  stems: StemSlot[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 declare global {
   interface HTMLMediaElement {
     setSinkId(sinkId: string): Promise<void>;

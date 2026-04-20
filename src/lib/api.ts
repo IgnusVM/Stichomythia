@@ -8,6 +8,7 @@ import type {
   MemoryBlock,
   SpeakerConfig,
   MixerState,
+  StemTrackConfig,
 } from '@/types';
 
 const BASE = '/api';
@@ -275,5 +276,19 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(state),
       }),
+  },
+
+  tracks: {
+    list: () => request<StemTrackConfig[]>('/tracks'),
+    create: (track: StemTrackConfig) =>
+      request<StemTrackConfig>('/tracks', { method: 'POST', body: JSON.stringify(track) }),
+    update: (id: string, data: Partial<StemTrackConfig>) =>
+      request<StemTrackConfig>(`/tracks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<{ ok: boolean }>(`/tracks/${id}`, { method: 'DELETE' }),
+    browse: (folderPath: string) =>
+      request<{ files: { name: string; path: string }[]; subdirs: { name: string; path: string }[]; current: string }>(
+        '/tracks/browse', { method: 'POST', body: JSON.stringify({ path: folderPath }) }
+      ),
+    fileUrl: (filePath: string) => `/api/tracks/file?path=${encodeURIComponent(filePath)}`,
   },
 };

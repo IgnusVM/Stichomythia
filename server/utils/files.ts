@@ -121,3 +121,7 @@ export function getSpeakersPath(): string {
 export function getMixerPath(): string {
   return path.join(DATA_DIR, 'mixer.json');
 }
+
+export function getTracksPath(): string {
+  return path.join(DATA_DIR, 'tracks.json');
+}

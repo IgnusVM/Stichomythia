@@ -15,6 +15,7 @@ import { generationRouter } from './routes/generation.js';
 import { exportRouter } from './routes/export.js';
 import { speakersRouter } from './routes/speakers.js';
 import { mixerRouter } from './routes/mixer.js';
+import { tracksRouter } from './routes/tracks.js';
 
 const app = express();
 const PORT = 3001;
@@ -30,6 +31,7 @@ app.use('/api/generation', generationRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/speakers', speakersRouter);
 app.use('/api/mixer', mixerRouter);
+app.use('/api/tracks', tracksRouter);
 
 app.use('/audio', express.static(getAudioDir()));
 
