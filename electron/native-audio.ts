@@ -411,7 +411,7 @@ export class NativeAudioPlayer {
   private startMixLoop(): void {
     this.stopMixLoop();
     this.mixTimer = setInterval(() => {
-      if (!this.playing && this.bufferState !== 'buffering') return;
+      if (!this.playing && this.bufferState === 'idle') return;
 
       let minBuffered = RING_CHUNKS;
       for (const sp of this.speakers.values()) {
