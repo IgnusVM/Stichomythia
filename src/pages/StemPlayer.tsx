@@ -61,14 +61,14 @@ export function StemPlayer() {
   const [playing, setPlaying] = useState(false);
   const [looping, setLooping] = useState(false);
   const [position, setPosition] = useState(0);
-  const [maxDuration, setMaxDuration] = useState(0);
-
   const [queue, setQueue] = useState<string[]>([]);
 
   const [browseFiles, setBrowseFiles] = useState<{ name: string; path: string }[]>([]);
   const [browseSubdirs, setBrowseSubdirs] = useState<{ name: string; path: string }[]>([]);
   const [browseCurrent, setBrowseCurrent] = useState('');
   const [nativeSpeakersReady, setNativeSpeakersReady] = useState(false);
+  const [bufferState, setBufferState] = useState<'idle' | 'buffering' | 'ready'>('idle');
+  const [bufferElapsed, setBufferElapsed] = useState(0);
 
   const playingRef = useRef(false);
   const stemsRef = useRef(stems);
@@ -79,11 +79,6 @@ export function StemPlayer() {
   tracksRef.current = tracks;
 
   const hasAnyStem = stems.some(s => s.rawBuffer !== null);
-
-  // Recalculate max duration when stems change
-  useEffect(() => {
-    setMaxDuration(Math.max(...stems.map(s => s.duration), 0));
-  }, [stems]);
 
   // Open native audio speakers on mount
   useEffect(() => {
@@ -101,19 +96,21 @@ export function StemPlayer() {
   useEffect(() => {
     if (!hasNativeAudio()) return;
     const na = getNativeAudio();
-    const cleanupPos = na.onPosition((pos) => {
-      setPosition(pos);
-    });
     const cleanupEnd = na.onEnded(() => {
       playingRef.current = false;
       setPlaying(false);
       setPosition(0);
+      setBufferState('idle');
       const q = queueRef.current;
       if (q.length > 0) {
         advanceQueueRef.current?.();
       }
     });
-    return () => { cleanupPos(); cleanupEnd(); };
+    const cleanupBuf = na.onBufferState((state, elapsed) => {
+      setBufferState(state);
+      setBufferElapsed(elapsed);
+    });
+    return () => { cleanupEnd(); cleanupBuf(); };
   }, []);
 
   useEffect(() => {
@@ -374,6 +371,12 @@ export function StemPlayer() {
     input.click();
   }, [openFolder]);
 
+  const handleBuffer = useCallback(async () => {
+    if (!hasNativeAudio()) return;
+    await syncStemsToNative(stemsRef.current);
+    await getNativeAudio().buffer();
+  }, [syncStemsToNative]);
+
   const handlePlay = useCallback(async () => {
     if (!hasNativeAudio()) return;
     engine.suspendAll();
@@ -398,16 +401,6 @@ export function StemPlayer() {
     await stopPlayback();
     setPosition(0);
   }, [stopPlayback]);
-
-  const handleSeek = useCallback(async (pos: number) => {
-    setPosition(pos);
-    if (hasNativeAudio()) {
-      await getNativeAudio().seek(pos);
-      if (playingRef.current) {
-        await getNativeAudio().play(pos);
-      }
-    }
-  }, []);
 
   const handleNext = useCallback(async () => {
     if (queueRef.current.length > 0) {
@@ -614,8 +607,6 @@ export function StemPlayer() {
                 index={i}
                 slot={stem.slot}
                 hasBuffer={stem.rawBuffer !== null}
-                duration={stem.duration}
-                position={position}
                 onUpdateSlot={(update) => updateSlot(i, update)}
                 onLoadBuffer={(buf, name) => loadBufferIntoSlot(i, buf, name)}
                 onRemove={() => removeStem(i)}
@@ -634,13 +625,13 @@ export function StemPlayer() {
           <StemTransport
             playing={playing}
             looping={looping}
-            position={position}
-            duration={maxDuration}
             hasQueue={queue.length > 0}
+            bufferState={bufferState}
+            bufferElapsed={bufferElapsed}
+            onBuffer={handleBuffer}
             onPlay={handlePlay}
             onPause={handlePause}
             onStop={handleStop}
-            onSeek={handleSeek}
             onToggleLoop={() => {
               const newLooping = !looping;
               setLooping(newLooping);

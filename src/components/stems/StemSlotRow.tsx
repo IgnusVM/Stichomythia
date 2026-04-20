@@ -7,19 +7,12 @@ interface Props {
   index: number;
   slot: StemSlot;
   hasBuffer: boolean;
-  duration: number;
-  position: number;
   onUpdateSlot: (update: Partial<StemSlot>) => void;
   onLoadBuffer: (buffer: ArrayBuffer, fileName: string) => void;
   onRemove: () => void;
 }
 
-function drawWaveform(
-  canvas: HTMLCanvasElement,
-  audioBuffer: AudioBuffer,
-  position: number,
-  duration: number,
-) {
+function drawWaveform(canvas: HTMLCanvasElement, audioBuffer: AudioBuffer) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
@@ -37,9 +30,6 @@ function drawWaveform(
   const step = Math.ceil(data.length / width);
   const mid = height / 2;
 
-  ctx.fillStyle = 'rgba(212, 168, 67, 0.15)';
-  ctx.fillRect(0, 0, (position / duration) * width, height);
-
   ctx.beginPath();
   ctx.strokeStyle = 'rgba(212, 168, 67, 0.6)';
   ctx.lineWidth = 1;
@@ -56,22 +46,12 @@ function drawWaveform(
     ctx.lineTo(i, mid + max * mid);
   }
   ctx.stroke();
-
-  const px = (position / duration) * width;
-  ctx.beginPath();
-  ctx.strokeStyle = '#D4A843';
-  ctx.lineWidth = 2;
-  ctx.moveTo(px, 0);
-  ctx.lineTo(px, height);
-  ctx.stroke();
 }
 
 export function StemSlotRow({
   index,
   slot,
   hasBuffer,
-  duration,
-  position,
   onUpdateSlot,
   onLoadBuffer,
   onRemove,
@@ -101,8 +81,8 @@ export function StemSlotRow({
 
   useEffect(() => {
     if (!canvasRef.current || !audioBuffer) return;
-    drawWaveform(canvasRef.current, audioBuffer, position, duration);
-  }, [audioBuffer, position, duration]);
+    drawWaveform(canvasRef.current, audioBuffer);
+  }, [audioBuffer]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

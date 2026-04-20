@@ -1,17 +1,18 @@
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Play, Pause, Square, Repeat, SkipForward } from 'lucide-react';
+import { Play, Pause, Square, Repeat, SkipForward, Loader2, Radio, Volume2 } from 'lucide-react';
+
+type BufferState = 'idle' | 'buffering' | 'ready';
 
 interface Props {
   playing: boolean;
   looping: boolean;
-  position: number;
-  duration: number;
   hasQueue: boolean;
+  bufferState: BufferState;
+  bufferElapsed: number;
+  onBuffer: () => void;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
-  onSeek: (position: number) => void;
   onToggleLoop: () => void;
   onNext: () => void;
   disabled: boolean;
@@ -26,13 +27,13 @@ function formatTime(seconds: number): string {
 export function StemTransport({
   playing,
   looping,
-  position,
-  duration,
   hasQueue,
+  bufferState,
+  bufferElapsed,
+  onBuffer,
   onPlay,
   onPause,
   onStop,
-  onSeek,
   onToggleLoop,
   onNext,
   disabled,
@@ -40,6 +41,31 @@ export function StemTransport({
   return (
     <div className="flex items-center gap-3 p-3 border-t border-gold/10 bg-card/80">
       <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onBuffer}
+          disabled={disabled || playing || bufferState === 'buffering'}
+          className={`border-gold/20 ${
+            bufferState === 'ready'
+              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+              : bufferState === 'buffering'
+                ? 'bg-gold-muted/30 text-gold border-gold/30'
+                : 'hover:bg-gold-muted'
+          }`}
+          title={
+            bufferState === 'ready' ? 'Speakers ready' :
+            bufferState === 'buffering' ? 'Buffering...' :
+            'Buffer speakers'
+          }
+        >
+          {bufferState === 'buffering' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Radio className="w-4 h-4" />
+          )}
+        </Button>
+
         {playing ? (
           <Button size="sm" variant="outline" onClick={onPause} disabled={disabled} className="border-gold/20 hover:bg-gold-muted">
             <Pause className="w-4 h-4" />
@@ -73,19 +99,25 @@ export function StemTransport({
         </Button>
       </div>
 
-      <span className="text-xs font-mono text-muted-foreground w-10 text-right">{formatTime(position)}</span>
-
-      <Slider
-        value={[position]}
-        min={0}
-        max={duration || 1}
-        step={0.1}
-        onValueChange={([v]) => onSeek(v)}
-        disabled={disabled}
-        className="flex-1"
-      />
-
-      <span className="text-xs font-mono text-muted-foreground w-10">{formatTime(duration)}</span>
+      {bufferState === 'buffering' ? (
+        <div className="flex items-center gap-2 flex-1">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-gold" />
+          <span className="text-xs text-gold font-mono">
+            Buffering speakers... {formatTime(bufferElapsed)}
+          </span>
+        </div>
+      ) : bufferState === 'ready' ? (
+        <div className="flex items-center gap-2 flex-1">
+          <span className="text-xs text-green-400 font-mono">Ready — hit play</span>
+        </div>
+      ) : playing ? (
+        <div className="flex items-center gap-2 flex-1">
+          <Volume2 className="w-3.5 h-3.5 text-gold animate-pulse" />
+          <span className="text-xs text-gold font-mono">Playing</span>
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
     </div>
   );
 }
