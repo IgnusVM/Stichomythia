@@ -213,39 +213,12 @@ export class AudioEngine {
     return sum / (data.length * 255);
   }
 
-  connectSource(speakerId: string, sourceNode: AudioNode): void {
-    const ch = this.channels.get(speakerId);
-    if (!ch) return;
-    sourceNode.connect(ch.inputNode);
-  }
-
-  createSourceFromElement(speakerId: string, element: HTMLMediaElement): MediaElementAudioSourceNode | null {
-    const ch = this.channels.get(speakerId);
-    if (!ch) return null;
-    const source = this.audioContext.createMediaElementSource(element);
-    source.connect(ch.inputNode);
-    return source;
-  }
-
   createSourceFromStream(speakerId: string, stream: MediaStream): MediaStreamAudioSourceNode | null {
     const ch = this.channels.get(speakerId);
     if (!ch) return null;
     const source = this.audioContext.createMediaStreamSource(stream);
     source.connect(ch.inputNode);
     return source;
-  }
-
-  createSourceFromBuffer(speakerId: string, buffer: AudioBuffer): AudioBufferSourceNode | null {
-    const ch = this.channels.get(speakerId);
-    if (!ch) return null;
-    const source = this.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ch.inputNode);
-    return source;
-  }
-
-  async decodeAudio(_speakerId: string, arrayBuffer: ArrayBuffer): Promise<AudioBuffer | null> {
-    return this.audioContext.decodeAudioData(arrayBuffer);
   }
 
   startKeepAlive(): void {
@@ -294,10 +267,6 @@ export class AudioEngine {
         resolve();
       }, duration * 1000 + 100);
     });
-  }
-
-  getChannelCurrentTime(_speakerId: string): number {
-    return this.audioContext.currentTime;
   }
 
   suspendAll(): void {

@@ -65,7 +65,6 @@ export function StemPlayer() {
 
   const [queue, setQueue] = useState<string[]>([]);
 
-  const [browseFolder, setBrowseFolder] = useState<string | null>(null);
   const [browseFiles, setBrowseFiles] = useState<{ name: string; path: string }[]>([]);
   const [browseSubdirs, setBrowseSubdirs] = useState<{ name: string; path: string }[]>([]);
   const [browseCurrent, setBrowseCurrent] = useState('');
@@ -243,18 +242,17 @@ export function StemPlayer() {
     }
   }, []);
 
-  const loadBufferIntoSlot = useCallback(async (index: number, buffer: ArrayBuffer, fileName: string, _filePath: string) => {
+  const loadStemAudio = useCallback(async (index: number, buffer: ArrayBuffer, filePath: string, fileName: string) => {
     try {
       const duration = await decodeDuration(buffer);
-      const uploaded = await api.tracks.upload(buffer, fileName);
+      const label = fileName.replace(/\.[^.]+$/, '');
+      const defaultSpeaker = speakers.length > 0 ? speakers[0].id : null;
 
       setStems(prev => prev.map((s, i) => {
         if (i !== index) return s;
-        const label = s.slot.label || fileName.replace(/\.[^.]+$/, '');
-        const speakerId = s.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
         return {
           ...s,
-          slot: { ...s.slot, filePath: uploaded.filePath, fileName, label, speakerId },
+          slot: { ...s.slot, filePath, fileName, label: s.slot.label || label, speakerId: s.slot.speakerId || defaultSpeaker },
           rawBuffer: buffer,
           duration,
         };
@@ -267,7 +265,7 @@ export function StemPlayer() {
         if (stemId) {
           const pcm = await extractPCM(buffer);
           await na.loadStem(stemId, pcm.left.buffer as ArrayBuffer, pcm.right.buffer as ArrayBuffer);
-          const speakerId = stemsRef.current[index]?.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
+          const speakerId = stemsRef.current[index]?.slot.speakerId || defaultSpeaker;
           if (speakerId) await na.assignStem(stemId, speakerId);
         }
       }
@@ -276,38 +274,16 @@ export function StemPlayer() {
     }
   }, [speakers]);
 
-  const loadFileFromServer = useCallback(async (index: number, filePath: string, fileName: string) => {
-    try {
-      const resp = await fetch(api.tracks.fileUrl(filePath));
-      const buf = await resp.arrayBuffer();
-      const duration = await decodeDuration(buf);
-      setStems(prev => prev.map((s, i) => {
-        if (i !== index) return s;
-        const label = s.slot.label || fileName.replace(/\.[^.]+$/, '');
-        const speakerId = s.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
-        return {
-          ...s,
-          slot: { ...s.slot, filePath, fileName, label, speakerId },
-          rawBuffer: buf,
-          duration,
-        };
-      }));
-      setDirty(true);
+  const loadBufferIntoSlot = useCallback(async (index: number, buffer: ArrayBuffer, fileName: string) => {
+    const uploaded = await api.tracks.upload(buffer, fileName);
+    await loadStemAudio(index, buffer, uploaded.filePath, fileName);
+  }, [loadStemAudio]);
 
-      if (hasNativeAudio()) {
-        const na = getNativeAudio();
-        const stemId = stemsRef.current[index]?.id;
-        if (stemId) {
-          const pcm = await extractPCM(buf);
-          await na.loadStem(stemId, pcm.left.buffer as ArrayBuffer, pcm.right.buffer as ArrayBuffer);
-          const speakerId = stemsRef.current[index]?.slot.speakerId || (speakers.length > 0 ? speakers[0].id : null);
-          if (speakerId) await na.assignStem(stemId, speakerId);
-        }
-      }
-    } catch {
-      console.error('Failed to load:', filePath);
-    }
-  }, [speakers]);
+  const loadFileFromServer = useCallback(async (index: number, filePath: string, fileName: string) => {
+    const resp = await fetch(api.tracks.fileUrl(filePath));
+    const buf = await resp.arrayBuffer();
+    await loadStemAudio(index, buf, filePath, fileName);
+  }, [loadStemAudio]);
 
   const handleSave = useCallback(async () => {
     const current = stemsRef.current;
@@ -372,7 +348,6 @@ export function StemPlayer() {
       setBrowseFiles(result.files);
       setBrowseSubdirs(result.subdirs);
       setBrowseCurrent(result.current);
-      setBrowseFolder(result.current);
     } catch {
       console.error('Cannot browse:', folderPath);
     }
@@ -556,7 +531,7 @@ export function StemPlayer() {
                 <FolderOpen className="w-3.5 h-3.5" />
               </Button>
             </div>
-            {browseFolder && (
+            {browseCurrent && (
               <div className="overflow-y-auto max-h-48">
                 <div className="px-3 pb-1">
                   <p className="text-[9px] text-muted-foreground truncate" title={browseCurrent}>{browseCurrent}</p>
@@ -588,11 +563,10 @@ export function StemPlayer() {
                       if (emptyIdx >= 0) {
                         loadFileFromServer(emptyIdx, f.path, f.name);
                       } else {
-                        setStems(prev => {
-                          const newStem = createEmptyLoaded();
-                          loadFileFromServer(prev.length, f.path, f.name);
-                          return [...prev, newStem];
-                        });
+                        const newStem = createEmptyLoaded();
+                        const newIndex = stemsRef.current.length;
+                        setStems(prev => [...prev, newStem]);
+                        loadFileFromServer(newIndex, f.path, f.name);
                       }
                     }}
                     className="flex items-center gap-1.5 px-3 py-1 w-full text-left text-[10px] hover:bg-gold-muted/50 hover:text-gold truncate"
@@ -643,7 +617,7 @@ export function StemPlayer() {
                 duration={stem.duration}
                 position={position}
                 onUpdateSlot={(update) => updateSlot(i, update)}
-                onLoadBuffer={(buf, name, path) => loadBufferIntoSlot(i, buf, name, path)}
+                onLoadBuffer={(buf, name) => loadBufferIntoSlot(i, buf, name)}
                 onRemove={() => removeStem(i)}
               />
             ))}

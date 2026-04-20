@@ -10,7 +10,7 @@ interface Props {
   duration: number;
   position: number;
   onUpdateSlot: (update: Partial<StemSlot>) => void;
-  onLoadBuffer: (buffer: ArrayBuffer, fileName: string, filePath: string) => void;
+  onLoadBuffer: (buffer: ArrayBuffer, fileName: string) => void;
   onRemove: () => void;
 }
 
@@ -83,9 +83,8 @@ export function StemSlotRow({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
-    const filePath = (file as unknown as { path?: string }).path || '';
     const arrayBuffer = await file.arrayBuffer();
-    onLoadBuffer(arrayBuffer, file.name, filePath);
+    onLoadBuffer(arrayBuffer, file.name);
   }, [onLoadBuffer]);
 
   useEffect(() => {

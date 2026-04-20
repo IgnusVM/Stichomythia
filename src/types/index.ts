@@ -245,21 +245,6 @@ export interface MixerState {
   channels: ChannelMixerState[];
 }
 
-export interface StemTrackState {
-  id: string;
-  fileName: string;
-  speakerId: string;
-  muted: boolean;
-  soloed: boolean;
-  duration: number;
-}
-
-export interface StemSession {
-  id: string;
-  stems: StemTrackState[];
-  createdAt: string;
-}
-
 export const DEFAULT_EQ_BANDS: EQBandSettings[] = [
   { frequency: 80, gain: 0, Q: 0.7, type: 'lowshelf' },
   { frequency: 250, gain: 0, Q: 1.4, type: 'peaking' },

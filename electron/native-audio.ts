@@ -2,6 +2,7 @@ import { Worker } from 'worker_threads';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { SAMPLE_RATE, CHANNELS, CHUNK_FRAMES, CHUNK_FLOATS, RING_CHUNKS, RING_FLOATS } from './audio-constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -9,13 +10,6 @@ const require = createRequire(import.meta.url);
 const audify: any = require('audify');
 const RtAudio = audify.RtAudio;
 const RtAudioApi = audify.RtAudioApi;
-
-const SAMPLE_RATE = 44100;
-const CHANNELS = 2;
-const CHUNK_FRAMES = 4096;
-const CHUNK_FLOATS = CHUNK_FRAMES * CHANNELS;
-const RING_CHUNKS = 11;
-const RING_FLOATS = RING_CHUNKS * CHUNK_FLOATS;
 
 interface StemPCM {
   left: Float32Array;
