@@ -130,7 +130,10 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
       const data = await window.electronAPI.getBtBattery();
       const levels = new Map<string, number>();
       for (const entry of data) {
-        const speaker = speakers.find(s => s.deviceLabel === entry.endpointName);
+        const speaker = speakers.find(s =>
+          s.deviceLabel === entry.endpointName ||
+          s.deviceLabel.startsWith(entry.endpointName)
+        );
         if (speaker) {
           levels.set(speaker.id, entry.battery);
         }
