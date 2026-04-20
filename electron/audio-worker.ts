@@ -25,10 +25,6 @@ const control = new Int32Array(controlBuffer);
 let rt: any = null;
 let deviceIdx = -1;
 let pumpTimer: ReturnType<typeof setInterval> | null = null;
-let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
-let lastAudioTime = 0;
-const silenceBuf = Buffer.alloc(CHUNK_FRAMES * CHANNELS * 4);
-const KEEPALIVE_INTERVAL = 15 * 60 * 1000;
 
 function openDevice(): boolean {
   try {
@@ -89,7 +85,6 @@ function pump(): void {
 
   if (readPos >= writePos) return;
 
-  lastAudioTime = Date.now();
   const ringOffset = (readPos % RING_CHUNKS) * CHUNK_FLOATS;
   const chunk = new Float32Array(CHUNK_FLOATS);
   chunk.set(ring.subarray(ringOffset, ringOffset + CHUNK_FLOATS));
@@ -98,18 +93,8 @@ function pump(): void {
   Atomics.store(control, 2, readPos + 1);
 }
 
-function keepalive(): void {
-  if (!rt) return;
-  if (Atomics.load(control, 0) === 1) return;
-  if (Date.now() - lastAudioTime < KEEPALIVE_INTERVAL) return;
-  try { rt.write(silenceBuf); } catch {}
-  lastAudioTime = Date.now();
-}
-
 if (openDevice()) {
-  lastAudioTime = Date.now();
   pumpTimer = setInterval(pump, 45);
-  keepaliveTimer = setInterval(keepalive, KEEPALIVE_INTERVAL);
 }
 
 parentPort?.on('message', (msg: { type: string }) => {
@@ -119,7 +104,6 @@ parentPort?.on('message', (msg: { type: string }) => {
     parentPort?.postMessage({ type: 'flushed' });
   } else if (msg.type === 'close') {
     if (pumpTimer) clearInterval(pumpTimer);
-    if (keepaliveTimer) clearInterval(keepaliveTimer);
     try { rt?.closeStream(); } catch {}
     process.exit(0);
   }
