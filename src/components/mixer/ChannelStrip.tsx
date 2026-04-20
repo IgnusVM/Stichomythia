@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
-import { Volume2, Battery, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
+import { Volume2, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
 import { LevelMeter } from './LevelMeter';
 import type { Speaker, EQBandSettings } from '@/types';
 import { useAudioEngine } from '@/contexts/AudioEngineContext';
