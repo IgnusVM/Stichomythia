@@ -239,6 +239,18 @@ ipcMain.handle('native-audio:seek', (_e, position: number) => {
   nativeAudio.seek(position);
 });
 
+ipcMain.handle('native-audio:start-capture', (_e, speakerIds: string[]) => {
+  nativeAudio.startCapture(speakerIds);
+});
+
+ipcMain.handle('native-audio:stop-capture', () => {
+  nativeAudio.stopCapture();
+});
+
+ipcMain.handle('native-audio:feed-capture', (_e, left: ArrayBuffer, right: ArrayBuffer) => {
+  nativeAudio.feedCapture(new Float32Array(left), new Float32Array(right));
+});
+
 ipcMain.handle('native-audio:set-looping', (_e, looping: boolean) => {
   nativeAudio.setLooping(looping);
 });

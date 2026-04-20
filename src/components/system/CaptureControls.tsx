@@ -8,13 +8,15 @@ interface Props {
 }
 
 export function CaptureControls({ sourceId }: Props) {
-  const { engine, speakers } = useAudioEngine();
+  const { speakers } = useAudioEngine();
   const [capturing, setCapturing] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
-  const sourceNodesRef = useRef<MediaStreamAudioSourceNode[]>([]);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
 
   const startCapture = useCallback(async () => {
-    if (!sourceId) return;
+    if (!sourceId || !window.electronAPI?.nativeAudio) return;
+    const na = window.electronAPI.nativeAudio;
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -39,28 +41,48 @@ export function CaptureControls({ sourceId }: Props) {
       stream.removeTrack(t);
     });
 
+    const ctx = new AudioContext({ sampleRate: 44100 });
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(4096, 2, 2);
+
+    processor.onaudioprocess = (e) => {
+      const left = e.inputBuffer.getChannelData(0);
+      const right = e.inputBuffer.numberOfChannels > 1
+        ? e.inputBuffer.getChannelData(1)
+        : left;
+      na.feedCapture(
+        left.buffer.slice(left.byteOffset, left.byteOffset + left.byteLength),
+        right.buffer.slice(right.byteOffset, right.byteOffset + right.byteLength),
+      );
+    };
+
+    source.connect(processor);
+    processor.connect(ctx.destination);
+
     streamRef.current = stream;
-    sourceNodesRef.current = [];
+    processorRef.current = processor;
+    ctxRef.current = ctx;
 
-    for (const speaker of speakers) {
-      const node = engine.createSourceFromStream(speaker.id, stream);
-      if (node) sourceNodesRef.current.push(node);
-    }
-
+    await na.startCapture(speakers.map(s => s.id));
     setCapturing(true);
-  }, [sourceId, engine, speakers]);
+  }, [sourceId, speakers]);
 
-  const stopCapture = useCallback(() => {
-    for (const node of sourceNodesRef.current) {
-      try { node.disconnect(); } catch {}
+  const stopCapture = useCallback(async () => {
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
     }
-    sourceNodesRef.current = [];
-
+    if (ctxRef.current) {
+      ctxRef.current.close().catch(() => {});
+      ctxRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-
+    if (window.electronAPI?.nativeAudio) {
+      await window.electronAPI.nativeAudio.stopCapture();
+    }
     setCapturing(false);
   }, []);
 

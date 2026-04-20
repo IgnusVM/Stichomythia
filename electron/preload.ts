@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('native-audio:play', fromPosition),
     pause: () => ipcRenderer.invoke('native-audio:pause'),
     stop: () => ipcRenderer.invoke('native-audio:stop'),
+    startCapture: (speakerIds: string[]) =>
+      ipcRenderer.invoke('native-audio:start-capture', speakerIds),
+    stopCapture: () => ipcRenderer.invoke('native-audio:stop-capture'),
+    feedCapture: (left: ArrayBuffer, right: ArrayBuffer) =>
+      ipcRenderer.invoke('native-audio:feed-capture', left, right),
     seek: (position: number) => ipcRenderer.invoke('native-audio:seek', position),
     setLooping: (looping: boolean) => ipcRenderer.invoke('native-audio:set-looping', looping),
     getState: () => ipcRenderer.invoke('native-audio:get-state') as Promise<{ playing: boolean; position: number; duration: number }>,

@@ -23,6 +23,9 @@ declare global {
     play: (fromPosition?: number) => Promise<void>;
     pause: () => Promise<void>;
     stop: () => Promise<void>;
+    startCapture: (speakerIds: string[]) => Promise<void>;
+    stopCapture: () => Promise<void>;
+    feedCapture: (left: ArrayBuffer, right: ArrayBuffer) => Promise<void>;
     seek: (position: number) => Promise<void>;
     setLooping: (looping: boolean) => Promise<void>;
     getState: () => Promise<{ playing: boolean; position: number; duration: number }>;

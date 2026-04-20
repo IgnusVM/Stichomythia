@@ -31,6 +31,9 @@ interface SpeakerState {
   stems: Set<string>;
 }
 
+const CAPTURE_RING_SECONDS = 5;
+const CAPTURE_RING_FRAMES = SAMPLE_RATE * CAPTURE_RING_SECONDS;
+
 export class NativeAudioPlayer {
   private speakers = new Map<string, SpeakerState>();
   private stems = new Map<string, StemPCM>();
@@ -48,6 +51,14 @@ export class NativeAudioPlayer {
   private onPlaybackEnd: (() => void) | null = null;
   private onPlaybackStart: (() => void) | null = null;
   private onBufferStateUpdate: ((state: 'idle' | 'buffering' | 'ready', elapsedSec: number) => void) | null = null;
+
+  private captureActive = false;
+  private captureLeft = new Float32Array(CAPTURE_RING_FRAMES);
+  private captureRight = new Float32Array(CAPTURE_RING_FRAMES);
+  private captureWritePos = 0;
+  private captureReadPos = 0;
+  private captureSpeakers = new Set<string>();
+  private captureMixTimer: ReturnType<typeof setInterval> | null = null;
 
   getDevices(): { index: number; name: string; outputChannels: number; isDefault: boolean }[] {
     const rt = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
@@ -317,7 +328,108 @@ export class NativeAudioPlayer {
     return this.playing;
   }
 
+  startCapture(speakerIds: string[]): void {
+    this.captureWritePos = 0;
+    this.captureReadPos = 0;
+    this.captureSpeakers.clear();
+    for (const id of speakerIds) {
+      if (this.speakers.has(id)) this.captureSpeakers.add(id);
+    }
+    if (this.captureSpeakers.size === 0) {
+      for (const id of this.speakers.keys()) this.captureSpeakers.add(id);
+    }
+    this.captureActive = true;
+
+    for (const sp of this.speakers.values()) {
+      sp.ringView.fill(0);
+      Atomics.store(sp.controlView, 0, 1);
+      Atomics.store(sp.controlView, 1, 0);
+      Atomics.store(sp.controlView, 2, 0);
+      sp.localWritePos = 0;
+    }
+
+    this.startCaptureMixLoop();
+    console.log(`[native-audio] Capture started → ${this.captureSpeakers.size} speakers`);
+  }
+
+  stopCapture(): void {
+    this.captureActive = false;
+    this.stopCaptureMixLoop();
+
+    for (const sp of this.speakers.values()) {
+      Atomics.store(sp.controlView, 0, 0);
+      try { sp.worker.postMessage({ type: 'flush' }); } catch {}
+    }
+
+    console.log('[native-audio] Capture stopped');
+  }
+
+  feedCapture(left: Float32Array, right: Float32Array): void {
+    if (!this.captureActive) return;
+    const len = left.length;
+    for (let i = 0; i < len; i++) {
+      const pos = this.captureWritePos % CAPTURE_RING_FRAMES;
+      this.captureLeft[pos] = left[i];
+      this.captureRight[pos] = right[i];
+      this.captureWritePos++;
+    }
+  }
+
+  isCaptureActive(): boolean {
+    return this.captureActive;
+  }
+
+  private startCaptureMixLoop(): void {
+    this.stopCaptureMixLoop();
+    this.captureMixTimer = setInterval(() => {
+      if (!this.captureActive) return;
+      this.captureMix();
+    }, 20);
+  }
+
+  private stopCaptureMixLoop(): void {
+    if (this.captureMixTimer) {
+      clearInterval(this.captureMixTimer);
+      this.captureMixTimer = null;
+    }
+  }
+
+  private captureMix(): void {
+    const available = this.captureWritePos - this.captureReadPos;
+    if (available < CHUNK_FRAMES) return;
+
+    const chunksAvailable = Math.floor(available / CHUNK_FRAMES);
+
+    for (const [spId, sp] of this.speakers) {
+      if (!this.captureSpeakers.has(spId)) continue;
+
+      const readPos = Atomics.load(sp.controlView, 2);
+      const buffered = sp.localWritePos - readPos;
+      if (buffered >= RING_CHUNKS - 1) continue;
+
+      const toWrite = Math.min(chunksAvailable, RING_CHUNKS - 1 - buffered);
+
+      for (let c = 0; c < toWrite; c++) {
+        const ringOffset = (sp.localWritePos % RING_CHUNKS) * CHUNK_FLOATS;
+        const captureStart = (this.captureReadPos + c * CHUNK_FRAMES) % CAPTURE_RING_FRAMES;
+
+        for (let f = 0; f < CHUNK_FRAMES; f++) {
+          const srcIdx = (captureStart + f) % CAPTURE_RING_FRAMES;
+          sp.ringView[ringOffset + f * 2] = this.captureLeft[srcIdx];
+          sp.ringView[ringOffset + f * 2 + 1] = this.captureRight[srcIdx];
+        }
+
+        sp.localWritePos++;
+        Atomics.store(sp.controlView, 1, sp.localWritePos);
+      }
+    }
+
+    const chunksConsumed = Math.min(chunksAvailable, RING_CHUNKS - 1);
+    this.captureReadPos += chunksConsumed * CHUNK_FRAMES;
+  }
+
   dispose(): void {
+    this.stopCapture();
     this.stop();
     for (const [id] of this.speakers) {
       this.closeSpeaker(id);
