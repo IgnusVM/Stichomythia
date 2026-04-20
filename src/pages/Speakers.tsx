@@ -20,12 +20,34 @@ export function Speakers() {
     api.speakers.get().then(config => setSpeakers(config.speakers));
   }, []);
 
-  const connectedDeviceIds = new Set(devices.map(d => d.deviceId));
+  const isRegistered = (d: MediaDeviceInfo) =>
+    speakers.some(s => s.deviceId === d.deviceId || s.deviceLabel === d.label);
+
+  const getConnectedDeviceId = (speaker: Speaker) => {
+    const exact = devices.find(d => d.deviceId === speaker.deviceId);
+    if (exact) return exact.deviceId;
+    const byLabel = devices.find(d => d.label === speaker.deviceLabel);
+    return byLabel?.deviceId ?? null;
+  };
+
+  useEffect(() => {
+    if (devices.length === 0 || speakers.length === 0) return;
+    let changed = false;
+    const updated = speakers.map(s => {
+      const match = devices.find(d => d.label === s.deviceLabel && d.deviceId !== s.deviceId);
+      if (match) {
+        changed = true;
+        return { ...s, deviceId: match.deviceId };
+      }
+      return s;
+    });
+    if (changed) saveSpeakers(updated);
+  }, [devices]);
 
   const unregisteredDevices = devices.filter(d =>
     d.deviceId !== 'default' &&
     d.deviceId !== 'communications' &&
-    !speakers.some(s => s.deviceId === d.deviceId)
+    !isRegistered(d)
   );
 
   const deviceCounts = new Map<string, number>();
@@ -60,7 +82,7 @@ export function Speakers() {
     await saveSpeakers(speakers.filter(s => s.id !== speakerId));
   };
 
-  const connectedCount = speakers.filter(s => connectedDeviceIds.has(s.deviceId)).length;
+  const connectedCount = speakers.filter(s => getConnectedDeviceId(s) !== null).length;
 
   return (
     <div className="flex flex-col h-full">
@@ -92,8 +114,8 @@ export function Speakers() {
                   key={speaker.id}
                   speaker={speaker}
                   index={i}
-                  connected={connectedDeviceIds.has(speaker.deviceId)}
-                  onTest={() => playTestTone(speaker.deviceId, i)}
+                  connected={getConnectedDeviceId(speaker) !== null}
+                  onTest={() => playTestTone(getConnectedDeviceId(speaker) ?? speaker.deviceId, i)}
                   onUpdateLabel={(label) => handleUpdateLabel(speaker.id, label)}
                   onRemove={() => handleRemoveSpeaker(speaker.id)}
                 />

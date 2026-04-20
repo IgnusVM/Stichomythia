@@ -43,10 +43,10 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
   const [mixerState, setMixerState] = useState<MixerState>({ masterVolume: 1, channels: [] });
   const { devices } = useAudioDevices();
 
-  const connectedDeviceIds = new Set(devices.map(d => d.deviceId));
   const connectionStatus = new Map<string, boolean>();
   for (const s of speakers) {
-    connectionStatus.set(s.id, connectedDeviceIds.has(s.deviceId));
+    const connected = devices.some(d => d.deviceId === s.deviceId || d.label === s.deviceLabel);
+    connectionStatus.set(s.id, connected);
   }
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,8 +81,11 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
 
     const existingIds = new Set(engine.channels.keys());
     for (const speaker of config.speakers) {
+      const currentDevice = devices.find(d => d.deviceId === speaker.deviceId)
+        ?? devices.find(d => d.label === speaker.deviceLabel);
+      const deviceId = currentDevice?.deviceId ?? speaker.deviceId;
       if (!existingIds.has(speaker.id)) {
-        engine.createChannel(speaker.id, speaker.deviceId);
+        engine.createChannel(speaker.id, deviceId);
       }
       existingIds.delete(speaker.id);
     }
