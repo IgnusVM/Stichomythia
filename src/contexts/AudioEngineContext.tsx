@@ -77,10 +77,19 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
 
   const refreshSpeakers = useCallback(async () => {
     const config = await api.speakers.get();
-    setSpeakers(config.speakers);
+    const seen = new Set<string>();
+    const dedupedSpeakers = config.speakers.filter(s => {
+      if (seen.has(s.deviceLabel)) return false;
+      seen.add(s.deviceLabel);
+      return true;
+    });
+    if (dedupedSpeakers.length < config.speakers.length) {
+      api.speakers.update({ speakers: dedupedSpeakers, updatedAt: new Date().toISOString() }).catch(() => {});
+    }
+    setSpeakers(dedupedSpeakers);
 
     const existingIds = new Set(engine.channels.keys());
-    for (const speaker of config.speakers) {
+    for (const speaker of dedupedSpeakers) {
       const currentDevice = devices.find(d => d.deviceId === speaker.deviceId)
         ?? devices.find(d => d.label === speaker.deviceLabel);
       const deviceId = currentDevice?.deviceId ?? speaker.deviceId;

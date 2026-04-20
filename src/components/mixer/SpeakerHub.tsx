@@ -19,56 +19,59 @@ export function SpeakerHub() {
   const connectedCount = [...connectionStatus.values()].filter(Boolean).length;
 
   return (
-    <div className="border-t border-gold/15 bg-card/95 backdrop-blur-sm shrink-0 transition-all duration-300">
+    <div className="border-t border-gold/15 bg-card/95 backdrop-blur-sm shrink-0">
       {mixerExpanded ? (
-        <div className="flex items-stretch">
+        <div>
           <button
             onClick={() => setMixerExpanded(false)}
-            className="px-2 flex items-center text-muted-foreground hover:text-gold-light transition-colors border-r border-gold/10"
+            className="flex items-center gap-1.5 h-7 px-3 w-full text-left hover:bg-gold/5 transition-colors"
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[9px] font-heading tracking-wider uppercase text-muted-foreground">Mixer</span>
+            <span className="text-[9px] text-muted-foreground ml-1">
+              {connectedCount}/{speakers.length} connected
+            </span>
           </button>
 
-          {speakers.map((speaker, i) => (
-            <ChannelStrip key={speaker.id} speaker={speaker} index={i} />
-          ))}
-
-          <MasterStrip />
+          <div className="flex items-stretch border-t border-gold/5">
+            {speakers.map((speaker, i) => (
+              <ChannelStrip key={speaker.id} speaker={speaker} index={i} />
+            ))}
+            <MasterStrip />
+          </div>
         </div>
       ) : (
-        <div className="flex items-center h-10 px-3 gap-3">
+        <div className="flex items-center h-9 px-3 gap-3">
           <button
             onClick={() => setMixerExpanded(true)}
-            className="flex items-center text-muted-foreground hover:text-gold-light transition-colors"
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-gold-light transition-colors"
           >
-            <ChevronUp className="w-4 h-4" />
+            <ChevronUp className="w-3.5 h-3.5" />
+            <span className="text-[9px] font-heading tracking-wider uppercase">Mixer</span>
           </button>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {speakers.map(s => (
-              <div
-                key={s.id}
-                className={`w-2 h-2 rounded-full ${
-                  connectionStatus.get(s.id) ? 'bg-green-500 connection-dot-connected' : 'bg-red-500'
-                }`}
-                title={s.label}
-              />
+              <div key={s.id} className="flex items-center gap-1">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    connectionStatus.get(s.id) ? 'bg-green-500 connection-dot-connected' : 'bg-red-500/80'
+                  }`}
+                />
+                <span className="text-[8px] text-muted-foreground">{s.label}</span>
+              </div>
             ))}
           </div>
 
-          <span className="text-[10px] text-muted-foreground">
-            {connectedCount}/{speakers.length} connected
-          </span>
-
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-[10px] text-muted-foreground">Master</span>
+            <span className="text-[9px] text-muted-foreground">Master</span>
             <Slider
               value={[mixerState.masterVolume]}
               min={0}
               max={1}
               step={0.01}
               onValueChange={([v]) => setMasterVolume(v)}
-              className="w-24"
+              className="w-20"
             />
           </div>
         </div>
