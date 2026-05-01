@@ -154,7 +154,7 @@ ttsRouter.post('/preview', async (req, res) => {
         conversationId: 'previews',
         turnId,
         openaiVoice: openaiVoice ?? 'alloy',
-        openaiModel: openaiModel ?? 'tts-1',
+        openaiModel: openaiModel ?? 'gpt-4o-mini-tts',
         openaiSpeed: openaiSpeed ?? 1.0,
       });
     } else {

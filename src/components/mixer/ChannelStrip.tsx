@@ -10,7 +10,7 @@ interface Props {
   index: number;
 }
 
-const BAND_LABELS = ['Low', 'Lo‑M', 'Mid', 'Hi‑M', 'High'];
+const BAND_LABELS = ['Bass', 'LoM', 'HiM', 'Treb'];
 const COMPACT_SLIDER = '[&_[data-slot=slider-thumb]]:size-2 [&_[data-slot=slider-thumb]]:border-0 [&_[data-slot=slider-thumb]]:after:inset-0';
 
 export function ChannelStrip({ speaker, index }: Props) {

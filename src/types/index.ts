@@ -229,6 +229,7 @@ export interface EQBandSettings {
   gain: number;
   Q: number;
   type: BiquadFilterType;
+  label: string;
 }
 
 export interface ChannelMixerState {
@@ -246,11 +247,10 @@ export interface MixerState {
 }
 
 export const DEFAULT_EQ_BANDS: EQBandSettings[] = [
-  { frequency: 80, gain: 0, Q: 0.7, type: 'lowshelf' },
-  { frequency: 250, gain: 0, Q: 1.4, type: 'peaking' },
-  { frequency: 1000, gain: 0, Q: 1.4, type: 'peaking' },
-  { frequency: 4000, gain: 0, Q: 1.4, type: 'peaking' },
-  { frequency: 12000, gain: 0, Q: 0.7, type: 'highshelf' },
+  { frequency: 100, gain: 0, Q: 0.7, type: 'lowshelf', label: 'Bass' },
+  { frequency: 800, gain: 0, Q: 1.0, type: 'peaking', label: 'Low-Mid' },
+  { frequency: 3000, gain: 0, Q: 1.0, type: 'peaking', label: 'High-Mid' },
+  { frequency: 10000, gain: 0, Q: 0.7, type: 'highshelf', label: 'Treble' },
 ];
 
 export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {

@@ -180,7 +180,7 @@ export async function renderTurnOpenAI(options: RenderOptions & { openaiVoice?: 
     if (!apiKey) throw new Error('OpenAI API key not configured');
 
     const voice = options.openaiVoice || 'alloy';
-    const rawModel = options.openaiModel || 'tts-1';
+    const rawModel = options.openaiModel || 'gpt-4o-mini-tts';
     const model = rawModel === 'gpt-4o-mini-tts' ? 'gpt-4o-mini-tts-2025-03-20' : rawModel;
 
     const isMinitts = model.startsWith('gpt-4o-mini-tts');

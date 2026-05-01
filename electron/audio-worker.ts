@@ -93,17 +93,16 @@ function pump(): void {
   Atomics.store(control, 2, readPos + 1);
 }
 
-if (openDevice()) {
-  pumpTimer = setInterval(pump, 45);
-}
+openDevice();
 
 parentPort?.on('message', (msg: { type: string }) => {
-  if (msg.type === 'flush') {
+  if (msg.type === 'pump') {
+    pump();
+  } else if (msg.type === 'flush') {
     Atomics.store(control, 0, 0);
     reopenStream();
     parentPort?.postMessage({ type: 'flushed' });
   } else if (msg.type === 'close') {
-    if (pumpTimer) clearInterval(pumpTimer);
     try { rt?.closeStream(); } catch {}
     process.exit(0);
   }

@@ -20,6 +20,113 @@ interface StemPCM {
   soloed: boolean;
 }
 
+interface BiquadState {
+  x1: number; x2: number; y1: number; y2: number;
+}
+
+interface BiquadCoeffs {
+  b0: number; b1: number; b2: number; a1: number; a2: number;
+}
+
+interface EQBand {
+  type: 'lowshelf' | 'peaking' | 'highshelf' | 'highpass';
+  frequency: number;
+  gain: number;
+  Q: number;
+  coeffs: BiquadCoeffs;
+  stateL: BiquadState;
+  stateR: BiquadState;
+}
+
+function computeCoeffs(type: string, freq: number, gain: number, Q: number): BiquadCoeffs {
+  const A = Math.pow(10, gain / 40);
+  const w0 = 2 * Math.PI * freq / SAMPLE_RATE;
+  const cosw0 = Math.cos(w0);
+  const sinw0 = Math.sin(w0);
+  let alpha: number, b0: number, b1: number, b2: number, a0: number, a1: number, a2: number;
+
+  if (type === 'peaking') {
+    alpha = sinw0 / (2 * Q);
+    b0 = 1 + alpha * A;
+    b1 = -2 * cosw0;
+    b2 = 1 - alpha * A;
+    a0 = 1 + alpha / A;
+    a1 = -2 * cosw0;
+    a2 = 1 - alpha / A;
+  } else if (type === 'lowshelf') {
+    const sqrtA = Math.sqrt(A);
+    alpha = sinw0 / 2 * Math.sqrt((A + 1 / A) * (1 / Q - 1) + 2);
+    b0 = A * ((A + 1) - (A - 1) * cosw0 + 2 * sqrtA * alpha);
+    b1 = 2 * A * ((A - 1) - (A + 1) * cosw0);
+    b2 = A * ((A + 1) - (A - 1) * cosw0 - 2 * sqrtA * alpha);
+    a0 = (A + 1) + (A - 1) * cosw0 + 2 * sqrtA * alpha;
+    a1 = -2 * ((A - 1) + (A + 1) * cosw0);
+    a2 = (A + 1) + (A - 1) * cosw0 - 2 * sqrtA * alpha;
+  } else {
+    const sqrtA = Math.sqrt(A);
+    alpha = sinw0 / 2 * Math.sqrt((A + 1 / A) * (1 / Q - 1) + 2);
+    b0 = A * ((A + 1) + (A - 1) * cosw0 + 2 * sqrtA * alpha);
+    b1 = -2 * A * ((A - 1) + (A + 1) * cosw0);
+    b2 = A * ((A + 1) + (A - 1) * cosw0 - 2 * sqrtA * alpha);
+    a0 = (A + 1) - (A - 1) * cosw0 + 2 * sqrtA * alpha;
+    a1 = 2 * ((A - 1) - (A + 1) * cosw0);
+    a2 = (A + 1) - (A - 1) * cosw0 - 2 * sqrtA * alpha;
+  }
+
+  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+}
+
+function computeHighpass(freq: number, Q: number): BiquadCoeffs {
+  const w0 = 2 * Math.PI * freq / SAMPLE_RATE;
+  const cosw0 = Math.cos(w0);
+  const alpha = Math.sin(w0) / (2 * Q);
+  const b0 = (1 + cosw0) / 2;
+  const b1 = -(1 + cosw0);
+  const b2 = (1 + cosw0) / 2;
+  const a0 = 1 + alpha;
+  const a1 = -2 * cosw0;
+  const a2 = 1 - alpha;
+  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+}
+
+function computeLowpass(freq: number, Q: number): BiquadCoeffs {
+  const w0 = 2 * Math.PI * freq / SAMPLE_RATE;
+  const cosw0 = Math.cos(w0);
+  const alpha = Math.sin(w0) / (2 * Q);
+  const b0 = (1 - cosw0) / 2;
+  const b1 = 1 - cosw0;
+  const b2 = (1 - cosw0) / 2;
+  const a0 = 1 + alpha;
+  const a1 = -2 * cosw0;
+  const a2 = 1 - alpha;
+  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+}
+
+interface CrossoverBand {
+  filters: { coeffs: BiquadCoeffs; stateL: BiquadState; stateR: BiquadState }[];
+}
+
+const CROSSOVER_FREQS = [250, 2000, 8000];
+
+function buildCrossoverBand(bandIndex: number, totalBands: number): CrossoverBand {
+  const filters: CrossoverBand['filters'] = [];
+  if (bandIndex > 0) {
+    const hpFreq = CROSSOVER_FREQS[bandIndex - 1];
+    filters.push({ coeffs: computeHighpass(hpFreq, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() });
+    filters.push({ coeffs: computeHighpass(hpFreq, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() });
+  }
+  if (bandIndex < totalBands - 1) {
+    const lpFreq = CROSSOVER_FREQS[bandIndex];
+    filters.push({ coeffs: computeLowpass(lpFreq, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() });
+    filters.push({ coeffs: computeLowpass(lpFreq, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() });
+  }
+  return { filters };
+}
+
+function makeBiquadState(): BiquadState {
+  return { x1: 0, x2: 0, y1: 0, y2: 0 };
+}
+
 interface SpeakerState {
   worker: Worker;
   ringBuffer: SharedArrayBuffer;
@@ -29,6 +136,8 @@ interface SpeakerState {
   localWritePos: number;
   deviceName: string;
   stems: Set<string>;
+  eq: EQBand[];
+  crossover: CrossoverBand | null;
 }
 
 const CAPTURE_RING_SECONDS = 5;
@@ -52,6 +161,9 @@ export class NativeAudioPlayer {
   private onPlaybackStart: (() => void) | null = null;
   private onBufferStateUpdate: ((state: 'idle' | 'buffering' | 'ready', elapsedSec: number) => void) | null = null;
 
+  private pumpTimer: ReturnType<typeof setInterval> | null = null;
+  private crossoverMode = false;
+
   private captureActive = false;
   private captureLeft = new Float32Array(CAPTURE_RING_FRAMES);
   private captureRight = new Float32Array(CAPTURE_RING_FRAMES);
@@ -59,6 +171,8 @@ export class NativeAudioPlayer {
   private captureReadPos = 0;
   private captureSpeakers = new Set<string>();
   private captureMixTimer: ReturnType<typeof setInterval> | null = null;
+  private capturePreBuffering = false;
+  private readonly CAPTURE_PREBUFFER_CHUNKS = 4;
 
   getDevices(): { index: number; name: string; outputChannels: number; isDefault: boolean }[] {
     const rt = new RtAudio(RtAudioApi.WINDOWS_WASAPI);
@@ -94,9 +208,18 @@ export class NativeAudioPlayer {
           workerData: { deviceName, ringBuffer, controlBuffer, speakerId },
         });
 
+        const defaultEQ: EQBand[] = [
+          { type: 'highpass', frequency: 70, gain: 0, Q: 0.707, coeffs: computeHighpass(70, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() },
+          { type: 'highpass', frequency: 70, gain: 0, Q: 0.707, coeffs: computeHighpass(70, 0.707), stateL: makeBiquadState(), stateR: makeBiquadState() },
+          { type: 'lowshelf', frequency: 100, gain: 0, Q: 0.7, coeffs: computeCoeffs('lowshelf', 100, 0, 0.7), stateL: makeBiquadState(), stateR: makeBiquadState() },
+          { type: 'peaking', frequency: 800, gain: 0, Q: 1.0, coeffs: computeCoeffs('peaking', 800, 0, 1.0), stateL: makeBiquadState(), stateR: makeBiquadState() },
+          { type: 'peaking', frequency: 3000, gain: 0, Q: 1.0, coeffs: computeCoeffs('peaking', 3000, 0, 1.0), stateL: makeBiquadState(), stateR: makeBiquadState() },
+          { type: 'highshelf', frequency: 10000, gain: 0, Q: 0.7, coeffs: computeCoeffs('highshelf', 10000, 0, 0.7), stateL: makeBiquadState(), stateR: makeBiquadState() },
+        ];
+
         const sp: SpeakerState = {
           worker, ringBuffer, controlBuffer, ringView, controlView,
-          localWritePos: 0, deviceName, stems: new Set(),
+          localWritePos: 0, deviceName, stems: new Set(), eq: defaultEQ, crossover: null,
         };
         this.speakers.set(speakerId, sp);
 
@@ -185,6 +308,36 @@ export class NativeAudioPlayer {
     if (stem) stem.soloed = soloed;
   }
 
+  setEQ(speakerId: string, bandIndex: number, settings: { gain?: number; frequency?: number; Q?: number }): void {
+    const sp = this.speakers.get(speakerId);
+    const idx = bandIndex + 2;
+    if (!sp || idx < 2 || idx >= sp.eq.length) return;
+    const band = sp.eq[idx];
+    if (settings.gain !== undefined) band.gain = settings.gain;
+    if (settings.frequency !== undefined) band.frequency = settings.frequency;
+    if (settings.Q !== undefined) band.Q = settings.Q;
+    band.coeffs = computeCoeffs(band.type, band.frequency, band.gain, band.Q);
+  }
+
+  setCrossoverMode(enabled: boolean): void {
+    this.crossoverMode = enabled;
+    const speakerList = [...this.speakers.entries()];
+    const totalBands = Math.min(speakerList.length, 4);
+    for (let i = 0; i < speakerList.length; i++) {
+      const [, sp] = speakerList[i];
+      if (enabled && i < totalBands) {
+        sp.crossover = buildCrossoverBand(i, totalBands);
+      } else {
+        sp.crossover = null;
+      }
+    }
+    console.log(`[native-audio] Crossover mode: ${enabled ? 'ON' : 'OFF'} (${totalBands} bands)`);
+  }
+
+  isCrossoverMode(): boolean {
+    return this.crossoverMode;
+  }
+
   setLooping(looping: boolean): void {
     this.looping = looping;
   }
@@ -235,6 +388,7 @@ export class NativeAudioPlayer {
     }
 
     this.startMixLoop();
+    this.startPumpBroadcast();
     this.startBufferingTimer();
     this.onBufferStateUpdate?.('buffering', 0);
 
@@ -263,6 +417,7 @@ export class NativeAudioPlayer {
     }
 
     this.stopMixLoop();
+    this.stopPumpBroadcast();
     this.stopPositionTimer();
     this.stopBufferingTimer();
 
@@ -281,6 +436,7 @@ export class NativeAudioPlayer {
     }
 
     this.stopMixLoop();
+    this.stopPumpBroadcast();
     this.stopPositionTimer();
     this.stopBufferingTimer();
     this.onBufferStateUpdate?.('idle', 0);
@@ -339,22 +495,24 @@ export class NativeAudioPlayer {
       for (const id of this.speakers.keys()) this.captureSpeakers.add(id);
     }
     this.captureActive = true;
+    this.capturePreBuffering = true;
 
     for (const sp of this.speakers.values()) {
       sp.ringView.fill(0);
-      Atomics.store(sp.controlView, 0, 1);
+      Atomics.store(sp.controlView, 0, 0);
       Atomics.store(sp.controlView, 1, 0);
       Atomics.store(sp.controlView, 2, 0);
       sp.localWritePos = 0;
     }
 
     this.startCaptureMixLoop();
-    console.log(`[native-audio] Capture started → ${this.captureSpeakers.size} speakers`);
+    console.log(`[native-audio] Capture started (pre-buffering ${this.CAPTURE_PREBUFFER_CHUNKS} chunks) → ${this.captureSpeakers.size} speakers`);
   }
 
   stopCapture(): void {
     this.captureActive = false;
     this.stopCaptureMixLoop();
+    this.stopPumpBroadcast();
 
     for (const sp of this.speakers.values()) {
       Atomics.store(sp.controlView, 0, 0);
@@ -427,6 +585,25 @@ export class NativeAudioPlayer {
           sp.ringView[ringOffset + f * 2 + 1] = this.captureRight[srcIdx];
         }
 
+        for (const band of sp.eq) {
+          if (band.gain === 0 && band.type !== 'highpass') continue;
+          const { b0, b1, b2, a1, a2 } = band.coeffs;
+          const sL = band.stateL;
+          const sR = band.stateR;
+          for (let f = 0; f < CHUNK_FRAMES; f++) {
+            const li = ringOffset + f * 2;
+            const ri = li + 1;
+            const xL = sp.ringView[li];
+            const yL = b0 * xL + b1 * sL.x1 + b2 * sL.x2 - a1 * sL.y1 - a2 * sL.y2;
+            sL.x2 = sL.x1; sL.x1 = xL; sL.y2 = sL.y1; sL.y1 = yL;
+            sp.ringView[li] = yL;
+            const xR = sp.ringView[ri];
+            const yR = b0 * xR + b1 * sR.x1 + b2 * sR.x2 - a1 * sR.y1 - a2 * sR.y2;
+            sR.x2 = sR.x1; sR.x1 = xR; sR.y2 = sR.y1; sR.y1 = yR;
+            sp.ringView[ri] = yR;
+          }
+        }
+
         sp.localWritePos++;
         Atomics.store(sp.controlView, 1, sp.localWritePos);
       }
@@ -436,6 +613,26 @@ export class NativeAudioPlayer {
 
     if (minWritten > 0) {
       this.captureReadPos += minWritten * CHUNK_FRAMES;
+    }
+
+    if (this.capturePreBuffering) {
+      let allReady = true;
+      for (const [spId, sp] of this.speakers) {
+        if (!this.captureSpeakers.has(spId)) continue;
+        if (sp.localWritePos < this.CAPTURE_PREBUFFER_CHUNKS) {
+          allReady = false;
+          break;
+        }
+      }
+      if (allReady) {
+        this.capturePreBuffering = false;
+        for (const [spId, sp] of this.speakers) {
+          if (!this.captureSpeakers.has(spId)) continue;
+          Atomics.store(sp.controlView, 0, 1);
+        }
+        this.startPumpBroadcast();
+        console.log('[native-audio] Capture pre-buffer complete, all speakers started simultaneously');
+      }
     }
   }
 
@@ -486,17 +683,69 @@ export class NativeAudioPlayer {
 
         sp.ringView.fill(0, ringOffset, end);
 
-        for (const stemId of sp.stems) {
-          const stem = this.stems.get(stemId);
-          if (!stem || stem.muted) continue;
-          if (anySoloed && !stem.soloed) continue;
+        if (this.crossoverMode) {
+          for (const stem of this.stems.values()) {
+            if (stem.muted) continue;
+            if (anySoloed && !stem.soloed) continue;
+            const vol = stem.volume;
+            for (let f = 0; f < CHUNK_FRAMES; f++) {
+              const idx = this.nextMixFrame + f;
+              if (idx >= stem.length) break;
+              sp.ringView[ringOffset + f * 2] += stem.left[idx] * vol;
+              sp.ringView[ringOffset + f * 2 + 1] += stem.right[idx] * vol;
+            }
+          }
+        } else {
+          for (const stemId of sp.stems) {
+            const stem = this.stems.get(stemId);
+            if (!stem || stem.muted) continue;
+            if (anySoloed && !stem.soloed) continue;
+            const vol = stem.volume;
+            for (let f = 0; f < CHUNK_FRAMES; f++) {
+              const idx = this.nextMixFrame + f;
+              if (idx >= stem.length) break;
+              sp.ringView[ringOffset + f * 2] += stem.left[idx] * vol;
+              sp.ringView[ringOffset + f * 2 + 1] += stem.right[idx] * vol;
+            }
+          }
+        }
 
-          const vol = stem.volume;
+        for (const band of sp.eq) {
+          if (band.gain === 0 && band.type !== 'highpass') continue;
+          const { b0, b1, b2, a1, a2 } = band.coeffs;
+          const sL = band.stateL;
+          const sR = band.stateR;
           for (let f = 0; f < CHUNK_FRAMES; f++) {
-            const idx = this.nextMixFrame + f;
-            if (idx >= stem.length) break;
-            sp.ringView[ringOffset + f * 2] += stem.left[idx] * vol;
-            sp.ringView[ringOffset + f * 2 + 1] += stem.right[idx] * vol;
+            const li = ringOffset + f * 2;
+            const ri = li + 1;
+            const xL = sp.ringView[li];
+            const yL = b0 * xL + b1 * sL.x1 + b2 * sL.x2 - a1 * sL.y1 - a2 * sL.y2;
+            sL.x2 = sL.x1; sL.x1 = xL; sL.y2 = sL.y1; sL.y1 = yL;
+            sp.ringView[li] = yL;
+            const xR = sp.ringView[ri];
+            const yR = b0 * xR + b1 * sR.x1 + b2 * sR.x2 - a1 * sR.y1 - a2 * sR.y2;
+            sR.x2 = sR.x1; sR.x1 = xR; sR.y2 = sR.y1; sR.y1 = yR;
+            sp.ringView[ri] = yR;
+          }
+        }
+
+        if (sp.crossover) {
+          for (const filt of sp.crossover.filters) {
+            const { b0, b1, b2, a1, a2 } = filt.coeffs;
+            const sL = filt.stateL;
+            const sR = filt.stateR;
+            for (let f = 0; f < CHUNK_FRAMES; f++) {
+              const li = ringOffset + f * 2;
+              const ri = li + 1;
+              const xL = sp.ringView[li];
+              const yL = b0 * xL + b1 * sL.x1 + b2 * sL.x2 - a1 * sL.y1 - a2 * sL.y2;
+              sL.x2 = sL.x1; sL.x1 = xL; sL.y2 = sL.y1; sL.y1 = yL;
+              sp.ringView[li] = yL;
+              const xR = sp.ringView[ri];
+              const yR = b0 * xR + b1 * sR.x1 + b2 * sR.x2 - a1 * sR.y1 - a2 * sR.y2;
+              sR.x2 = sR.x1; sR.x1 = xR; sR.y2 = sR.y1; sR.y1 = yR;
+              sp.ringView[ri] = yR;
+            }
           }
         }
 
@@ -543,6 +792,7 @@ export class NativeAudioPlayer {
             Atomics.store(sp.controlView, 0, 0);
           }
           this.stopMixLoop();
+          this.stopPumpBroadcast();
           this.stopPositionTimer();
           this.onPlaybackEnd?.();
         }
@@ -554,6 +804,23 @@ export class NativeAudioPlayer {
     if (this.mixTimer) {
       clearInterval(this.mixTimer);
       this.mixTimer = null;
+    }
+  }
+
+  private startPumpBroadcast(): void {
+    this.stopPumpBroadcast();
+    const msg = { type: 'pump' };
+    this.pumpTimer = setInterval(() => {
+      for (const sp of this.speakers.values()) {
+        sp.worker.postMessage(msg);
+      }
+    }, 45);
+  }
+
+  private stopPumpBroadcast(): void {
+    if (this.pumpTimer) {
+      clearInterval(this.pumpTimer);
+      this.pumpTimer = null;
     }
   }
 

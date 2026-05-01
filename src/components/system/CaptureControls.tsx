@@ -66,6 +66,7 @@ export function CaptureControls({ sourceId }: Props) {
     processorRef.current = processor;
     ctxRef.current = ctx;
 
+    await Promise.all(speakers.map(s => na.openSpeaker(s.id, s.deviceLabel)));
     await na.startCapture(speakers.map(s => s.id));
     setCapturing(true);
   }, [sourceId, speakers]);
@@ -84,10 +85,12 @@ export function CaptureControls({ sourceId }: Props) {
       streamRef.current = null;
     }
     if (window.electronAPI?.nativeAudio) {
-      await window.electronAPI.nativeAudio.stopCapture();
+      const na = window.electronAPI.nativeAudio;
+      await na.stopCapture();
+      await Promise.all(speakers.map(s => na.closeSpeaker(s.id)));
     }
     setCapturing(false);
-  }, []);
+  }, [speakers]);
 
   return (
     <div className="flex items-center gap-3 p-3 border rounded-lg border-gold/10 bg-card/50">

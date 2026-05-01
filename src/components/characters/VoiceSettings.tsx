@@ -29,24 +29,35 @@ interface Props {
   onChange: (voice: VoiceConfig) => void;
 }
 
-const OPENAI_VOICES = [
-  { id: 'alloy', label: 'Alloy — neutral, balanced' },
-  { id: 'ash', label: 'Ash — warm, conversational' },
-  { id: 'ballad', label: 'Ballad — expressive, storytelling' },
-  { id: 'coral', label: 'Coral — warm, inviting' },
-  { id: 'echo', label: 'Echo — clear, smooth' },
-  { id: 'fable', label: 'Fable — expressive, animated' },
-  { id: 'onyx', label: 'Onyx — deep, authoritative' },
-  { id: 'nova', label: 'Nova — warm, friendly' },
-  { id: 'sage', label: 'Sage — calm, measured' },
-  { id: 'shimmer', label: 'Shimmer — bright, optimistic' },
+type OpenAIModelId = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+
+const ALL_MODELS: OpenAIModelId[] = ['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts'];
+const GPT4O_ONLY: OpenAIModelId[] = ['gpt-4o-mini-tts'];
+
+const OPENAI_VOICES: { id: string; label: string; models: OpenAIModelId[] }[] = [
+  { id: 'alloy',   label: 'Alloy — neutral, balanced',           models: ALL_MODELS },
+  { id: 'ash',     label: 'Ash — warm, conversational',          models: GPT4O_ONLY },
+  { id: 'ballad',  label: 'Ballad — expressive, storytelling',   models: GPT4O_ONLY },
+  { id: 'coral',   label: 'Coral — warm, inviting',              models: GPT4O_ONLY },
+  { id: 'echo',    label: 'Echo — clear, smooth',                models: ALL_MODELS },
+  { id: 'fable',   label: 'Fable — expressive, animated',        models: ALL_MODELS },
+  { id: 'onyx',    label: 'Onyx — deep, authoritative',          models: ALL_MODELS },
+  { id: 'nova',    label: 'Nova — warm, friendly',               models: ALL_MODELS },
+  { id: 'sage',    label: 'Sage — calm, measured',               models: GPT4O_ONLY },
+  { id: 'shimmer', label: 'Shimmer — bright, optimistic',        models: ALL_MODELS },
+  { id: 'verse',   label: 'Verse — versatile, dynamic',          models: GPT4O_ONLY },
 ];
 
-const OPENAI_MODELS = [
-  { id: 'tts-1', label: 'TTS-1 — fast, lower quality' },
-  { id: 'tts-1-hd', label: 'TTS-1-HD — slower, higher quality' },
-  { id: 'gpt-4o-mini-tts', label: 'GPT-4o Mini TTS — best quality' },
+const OPENAI_MODELS: { id: OpenAIModelId; label: string }[] = [
+  { id: 'gpt-4o-mini-tts', label: 'GPT-4o Mini TTS — best quality, all voices' },
+  { id: 'tts-1-hd',        label: 'TTS-1-HD — high quality, original 6 voices' },
+  { id: 'tts-1',           label: 'TTS-1 — fast, lower quality, original 6 voices' },
 ];
+
+function voiceSupportsModel(voiceId: string, modelId: OpenAIModelId): boolean {
+  const v = OPENAI_VOICES.find((x) => x.id === voiceId);
+  return v ? v.models.includes(modelId) : true;
+}
 
 function rateToNumber(rate: string): number {
   return parseInt(rate.replace('%', '').replace('+', ''), 10) || 0;
@@ -193,23 +204,44 @@ export function VoiceSettings({ voice, onChange }: Props) {
         </>
       )}
 
-      {provider === 'openai' && (
+      {provider === 'openai' && (() => {
+        const currentModel = (voice.openaiModel ?? 'gpt-4o-mini-tts') as OpenAIModelId;
+        const currentVoice = voice.openaiVoice ?? 'alloy';
+        const voiceCompatible = voiceSupportsModel(currentVoice, currentModel);
+        return (
         <>
           <div>
-            <Label>OpenAI Voice</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>OpenAI Voice</Label>
+              {!voiceCompatible && (
+                <span className="text-xs text-amber-500">
+                  Not supported by current model
+                </span>
+              )}
+            </div>
             <Select
-              value={voice.openaiVoice ?? 'alloy'}
+              value={currentVoice}
               onValueChange={(val) => onChange({ ...voice, openaiVoice: val })}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {OPENAI_VOICES.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.label}
-                  </SelectItem>
-                ))}
+                {OPENAI_VOICES.map((v) => {
+                  const supported = v.models.includes(currentModel);
+                  return (
+                    <SelectItem key={v.id} value={v.id} disabled={!supported}>
+                      <span className="flex items-center justify-between gap-3 w-full">
+                        <span>{v.label}</span>
+                        {!supported && (
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
+                            GPT-4o only
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -217,8 +249,16 @@ export function VoiceSettings({ voice, onChange }: Props) {
           <div>
             <Label>OpenAI Model</Label>
             <Select
-              value={voice.openaiModel ?? 'tts-1'}
-              onValueChange={(val) => onChange({ ...voice, openaiModel: val })}
+              value={currentModel}
+              onValueChange={(val) => {
+                const next = val as OpenAIModelId;
+                const voiceStillOk = voiceSupportsModel(currentVoice, next);
+                onChange({
+                  ...voice,
+                  openaiModel: next,
+                  openaiVoice: voiceStillOk ? currentVoice : 'alloy',
+                });
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -231,6 +271,10 @@ export function VoiceSettings({ voice, onChange }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              GPT-4o Mini TTS supports all 11 voices and per-turn mood. Legacy
+              tts-1 / tts-1-hd only support the 6 original voices.
+            </p>
           </div>
 
           <div>
@@ -249,7 +293,8 @@ export function VoiceSettings({ voice, onChange }: Props) {
             />
           </div>
         </>
-      )}
+        );
+      })()}
 
       <div>
         <Label>Preview</Label>

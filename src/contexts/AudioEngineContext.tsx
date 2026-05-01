@@ -106,6 +106,11 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
 
     engine.startKeepAlive();
 
+    if (window.electronAPI?.nativeAudio) {
+      const na = window.electronAPI.nativeAudio;
+      await Promise.all(dedupedSpeakers.map(s => na.openSpeaker(s.id, s.deviceLabel)));
+    }
+
     try {
       const saved = await api.mixer.get();
       if (saved.masterVolume !== undefined) {
@@ -117,7 +122,10 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
         engine.setVolume(ch.speakerId, ch.volume);
         engine.setMute(ch.speakerId, ch.muted);
         engine.setSolo(ch.speakerId, ch.soloed);
-        ch.eq.forEach((band, i) => engine.setEQ(ch.speakerId, i, band));
+        ch.eq.forEach((band, i) => {
+          engine.setEQ(ch.speakerId, i, band);
+          window.electronAPI?.nativeAudio?.setEQ(ch.speakerId, i, band);
+        });
       }
     } catch {}
 
@@ -178,6 +186,7 @@ export function AudioEngineProvider({ children }: { children: React.ReactNode })
 
   const setEQ = useCallback((speakerId: string, bandIndex: number, settings: Partial<EQBandSettings>) => {
     engine.setEQ(speakerId, bandIndex, settings);
+    window.electronAPI?.nativeAudio?.setEQ(speakerId, bandIndex, settings);
     syncMixerState();
   }, [engine, syncMixerState]);
 

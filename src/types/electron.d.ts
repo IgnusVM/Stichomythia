@@ -28,6 +28,9 @@ declare global {
     feedCapture: (left: ArrayBuffer, right: ArrayBuffer) => Promise<void>;
     seek: (position: number) => Promise<void>;
     setLooping: (looping: boolean) => Promise<void>;
+    setEQ: (speakerId: string, bandIndex: number, settings: { gain?: number; frequency?: number; Q?: number }) => Promise<void>;
+    setCrossover: (enabled: boolean) => Promise<void>;
+    getCrossover: () => Promise<boolean>;
     getState: () => Promise<{ playing: boolean; position: number; duration: number }>;
     onPosition: (cb: (pos: number, dur: number) => void) => () => void;
     onEnded: (cb: () => void) => () => void;

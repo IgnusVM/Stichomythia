@@ -32,3 +32,6 @@ release/
 data/
 exports/
 .env
+
+# AI agent local config (skills/credentials - re-install via `specify init` per dev)
+.claude/

@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Slider } from '@/components/ui/slider';
-import { Volume2, BatteryLow, BatteryMedium, BatteryFull, SlidersHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Volume2, BatteryLow, BatteryMedium, BatteryFull, SlidersHorizontal, Split } from 'lucide-react';
 import { LevelMeter } from '@/components/mixer/LevelMeter';
 import { useAudioEngine } from '@/contexts/AudioEngineContext';
 import type { EQBandSettings } from '@/types';
 
-const BAND_LABELS = ['Low Shelf', 'Low-Mid', 'Mid', 'Hi-Mid', 'High Shelf'];
+const BAND_LABELS = ['Bass', 'Low-Mid', 'High-Mid', 'Treble'];
 
 function FullChannelStrip({ speakerId, index }: { speakerId: string; index: number }) {
   const {
@@ -121,13 +122,12 @@ function FullChannelStrip({ speakerId, index }: { speakerId: string; index: numb
       </div>
 
       <div className="border-t border-gold/10 pt-3">
-        <p className="text-[10px] font-heading tracking-wider text-gold/60 uppercase mb-2">Parametric EQ</p>
+        <p className="text-[10px] font-heading tracking-wider text-gold/60 uppercase mb-2">EQ</p>
         <div className="space-y-2">
           {eq.map((band: EQBandSettings, i: number) => (
             <div key={i} className="space-y-0.5">
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>{BAND_LABELS[i]}</span>
-                <span>{band.frequency}Hz</span>
+                <span>{band.label ?? BAND_LABELS[i]}</span>
                 <span className="font-mono w-10 text-right">{band.gain > 0 ? '+' : ''}{band.gain.toFixed(1)}dB</span>
               </div>
               <Slider
@@ -138,20 +138,6 @@ function FullChannelStrip({ speakerId, index }: { speakerId: string; index: numb
                 onValueChange={([v]) => setEQ(speakerId, i, { gain: v })}
                 className="w-full"
               />
-              {band.type === 'peaking' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-muted-foreground">Q</span>
-                  <Slider
-                    value={[band.Q]}
-                    min={0.1}
-                    max={10}
-                    step={0.1}
-                    onValueChange={([v]) => setEQ(speakerId, i, { Q: v })}
-                    className="flex-1"
-                  />
-                  <span className="text-[9px] text-muted-foreground font-mono w-6 text-right">{band.Q.toFixed(1)}</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -160,10 +146,23 @@ function FullChannelStrip({ speakerId, index }: { speakerId: string; index: numb
   );
 }
 
+const CROSSOVER_LABELS = ['Bass\n70–250 Hz', 'Low-Mid\n250–2k Hz', 'High-Mid\n2k–8k Hz', 'Treble\n8k+ Hz'];
+
 export function Mixer() {
   const { speakers, mixerState, setMasterVolume } = useAudioEngine();
   const masterVolume = mixerState.masterVolume;
   const masterDb = masterVolume > 0 ? (20 * Math.log10(masterVolume)).toFixed(1) : '-∞';
+  const [crossover, setCrossover] = useState(false);
+
+  useEffect(() => {
+    window.electronAPI?.nativeAudio?.getCrossover().then(v => setCrossover(v));
+  }, []);
+
+  const toggleCrossover = async () => {
+    const next = !crossover;
+    setCrossover(next);
+    await window.electronAPI?.nativeAudio?.setCrossover(next);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -172,7 +171,25 @@ export function Mixer() {
           <SlidersHorizontal className="w-5 h-5 text-gold" />
           <h1 className="text-base font-heading tracking-wider">Mixer</h1>
           <span className="text-xs text-muted-foreground">{speakers.length} channels</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={toggleCrossover}
+            className={`ml-auto ${crossover ? 'border-gold bg-gold/10 text-gold' : 'border-gold/20 text-muted-foreground'}`}
+          >
+            <Split className="w-3.5 h-3.5 mr-1.5" />
+            Crossover
+          </Button>
         </div>
+        {crossover && (
+          <div className="flex gap-2 mt-2">
+            {speakers.slice(0, 4).map((s, i) => (
+              <span key={s.id} className="text-[10px] text-gold/70 bg-gold/5 px-2 py-0.5 rounded">
+                {s.label}: {CROSSOVER_LABELS[i]}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('native-audio:feed-capture', left, right),
     seek: (position: number) => ipcRenderer.invoke('native-audio:seek', position),
     setLooping: (looping: boolean) => ipcRenderer.invoke('native-audio:set-looping', looping),
+    setEQ: (speakerId: string, bandIndex: number, settings: { gain?: number; frequency?: number; Q?: number }) =>
+      ipcRenderer.invoke('native-audio:set-eq', speakerId, bandIndex, settings),
+    setCrossover: (enabled: boolean) => ipcRenderer.invoke('native-audio:set-crossover', enabled),
+    getCrossover: () => ipcRenderer.invoke('native-audio:get-crossover') as Promise<boolean>,
     getState: () => ipcRenderer.invoke('native-audio:get-state') as Promise<{ playing: boolean; position: number; duration: number }>,
     onPosition: (cb: (pos: number, dur: number) => void) => {
       const handler = (_e: Electron.IpcRendererEvent, pos: number, dur: number) => cb(pos, dur);

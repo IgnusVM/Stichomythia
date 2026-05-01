@@ -255,6 +255,18 @@ ipcMain.handle('native-audio:set-looping', (_e, looping: boolean) => {
   nativeAudio.setLooping(looping);
 });
 
+ipcMain.handle('native-audio:set-eq', (_e, speakerId: string, bandIndex: number, settings: { gain?: number; frequency?: number; Q?: number }) => {
+  nativeAudio.setEQ(speakerId, bandIndex, settings);
+});
+
+ipcMain.handle('native-audio:set-crossover', (_e, enabled: boolean) => {
+  nativeAudio.setCrossoverMode(enabled);
+});
+
+ipcMain.handle('native-audio:get-crossover', () => {
+  return nativeAudio.isCrossoverMode();
+});
+
 ipcMain.handle('native-audio:get-state', () => {
   return {
     playing: nativeAudio.isPlaying(),
